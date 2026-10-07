@@ -225,6 +225,32 @@ if [ $needs_claude -eq 1 ]; then
   fi
 fi
 
+# Another folder already registered as the "claude-kit" marketplace (an older copy, a
+# personal fork)? Installing points the name here, and mods only that folder has stop loading.
+if [ $needs_claude -eq 1 ]; then
+  other="$(claude plugin marketplace list 2>/dev/null | awk -v m="> $MARKET" '$0 ~ m"$" {getline; if (match($0, /Folder \(.*\)/)) print substr($0, RSTART + 8, RLENGTH - 9)}' | head -1 || true)"
+  if [ -n "$other" ] && [ "$other" != "$KIT" ] && [ -d "$other" ]; then
+    lost=""
+    for p in $(printf '%s\n' "$PLUGIN_LIST" | grep -Eo "[A-Za-z0-9_.-]+@$MARKET" | sed "s/@$MARKET//" | sort -u); do
+      [ -d "$KIT/mods/$p" ] || lost="$lost $p"
+    done
+    echo
+    echo "${Y}!${N} The marketplace name \"$MARKET\" is in use by another folder: $other"
+    echo "  Installing makes it point here instead."
+    if [ -n "$lost" ]; then
+      echo "  ${R}These mods are only in that folder and would stop loading:${N}$lost"
+      echo "  To keep them, give that folder's .claude-plugin/marketplace.json another \"name\","
+      echo "  then: claude plugin marketplace add \"$other\" and install them from it."
+    fi
+    if [ "$YES" -eq 0 ] && [ -t 0 ]; then
+      printf '  Point "%s" here? [y/N] ' "$MARKET"; read -r ans
+      case "$ans" in y|Y|yes) ;; *) echo "Nothing changed."; exit 0 ;; esac
+    elif [ -n "$lost" ] && [ "$YES" -eq 1 ]; then
+      echo "  Stopping: --yes would break those mods. Rename that marketplace first, or run without --yes." >&2; exit 1
+    fi
+  fi
+fi
+
 echo
 echo "${B}Plan${N}"
 for t in "${TODO[@]}"; do

@@ -6,6 +6,7 @@ import Hooks from '../hooks'
 function engineOf(on: On) {
   const spawned: (string | undefined)[] = []
   const steps: string[] = []
+  const toasts: string[] = []
   mock.clock(on)
   mock.store(on)
   on('session.cwd', () => ({ value: '/Users/me/dev/web-app' }))
@@ -14,7 +15,10 @@ function engineOf(on: On) {
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.close', () => ({ value: undefined }))
   on('ui.status', () => ({ value: undefined }))
-  on('ui.toast', () => ({ value: undefined }))
+  on('ui.toast', ($, e) => {
+    toasts.push(e.text)
+    return { value: undefined }
+  })
   on('agent.spawn', ($, e) => {
     spawned.push(e.model)
     return { model: e.model ?? e.parentModel, agentId: `agent-${spawned.length}` }
@@ -24,7 +28,7 @@ function engineOf(on: On) {
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: null, usage: null } as never
   })
   on('tool.call', () => ({ result: 'ran' as never }))
-  return { spawned, steps }
+  return { spawned, steps, toasts }
 }
 
 /** The restrictive choice the enforcement tests run under: only opus and fable on. */
@@ -142,10 +146,45 @@ describe('/models', () => {
     on('config.set', ($, e) => { written[e.key] = e.value; return { value: e.value } })
     await run($, 'opus,sonnet,fable')
     const r = await run($, 'default')
-    expect(r.text).toContain('default for every repo')
+    expect(r.text).toContain('as the global default for every repo without its own saved choice')
     expect(written['model-guard.defaultAllowed']).toBe('opus,sonnet,fable')
     expect(written['model-guard.mode']).toBe('deny')
     expect(written['model-guard.fallback']).toBe('opus')
+  })
+  test('the pane\'s global save writes the settings rows and the header then reads "global default"', async ($, on) => {
+    const { toasts } = engineOf(on)
+    const written: Record<string, unknown> = {}
+    on('config.set', ($, e) => { written[e.key] = e.value; return { value: e.value } })
+    await run($)
+    const ui = await $.ui.mount({ plugin: 'model-guard', surface: 'desktop', component: 'Pane', requestId: 'models', props: { bodyColumns: 48 } as never })
+    await ui.press({ key: 'toggle-haiku' })
+    await ui.press({ key: 'mode' })
+    expect((await ui.find({ key: 'head' }))?.text).toContain('changed this session')
+    await ui.press({ key: 'default' })
+    expect(written['model-guard.defaultAllowed']).toBe('opus,sonnet,fable,other')
+    expect(written['model-guard.mode']).toBe('swap')
+    expect((await ui.find({ key: 'head' }))?.text).toContain('global default')
+    expect(toasts.at(-1)).toContain('as the global default')
+    expect(toasts.at(-1)).not.toContain('keeps its own saved choice')
+  })
+  test('a repo with its own saved choice keeps it after a global save, and the toast says so', async ($, on) => {
+    const { toasts } = engineOf(on)
+    on('config.set', ($, e) => ({ value: e.value }))
+    await run($, 'opus')
+    await run($, 'save')
+    const ui = await $.ui.mount({ plugin: 'model-guard', surface: 'terminal', component: 'Pane', requestId: 'models', props: { bodyColumns: 48 } as never })
+    await ui.press({ key: 'toggle-sonnet' })
+    await ui.press({ key: 'default' })
+    expect(toasts.at(-1)).toContain('web-app keeps its own saved choice')
+    expect((await ui.find({ key: 'head' }))?.text).toContain('changed this session')
+    await ui.press({ key: 'reset' })
+    expect((await run($, '')).text).toContain('allowed in this session: opus (')
+  })
+  test('a refused settings row is reported and nothing claims success', async ($, on) => {
+    engineOf(on)
+    on('config.set', ($, e) => (e.key === 'model-guard.mode' ? { deny: 'managed by policy' } : { value: e.value }))
+    const r = await run($, 'default')
+    expect(r.text).toContain('Not saved as the global default: model-guard.mode: managed by policy')
   })
   test('a list sets the session, save keeps it for the repo, reset returns to it', async ($, on) => {
     engineOf(on)
@@ -164,7 +203,7 @@ describe('/models', () => {
   test('the pane toggles families and cycles the fallback on every surface', OPUS_FABLE, async ($, on) => {
     engineOf(on)
     await run($)
-    for (const surface of ['terminal', 'desktop', 'mobile'] as const) {
+    for (const surface of ['terminal', 'desktop', 'mobile', 'vscode'] as const) {
       const ui = await $.ui.mount({ plugin: 'model-guard', surface, component: 'Pane', requestId: 'models', props: { bodyColumns: 48 } as never })
       expect(await ui.find({ key: 'toggle-haiku' })).toBeDefined()
       expect(await ui.find({ key: 'close' })).toBeDefined()

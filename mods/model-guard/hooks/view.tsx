@@ -62,7 +62,7 @@ export function drawModels(t: ElementTable, state: GuardState, actions: Actions,
     <Box flexDirection="column" paddingX={1}>
       <Box key="head" flexDirection="row">
         <Text bold>MODELS</Text>
-        <Text dimColor> · {state.source === 'session' ? 'changed this session' : state.source === 'repo' ? `${repoLabel} default` : 'default'}</Text>
+        <Text dimColor> · {state.source === 'session' ? 'changed this session' : state.source === 'repo' ? `${repoLabel} default` : 'global default'}</Text>
       </Box>
       {rows}
       <Box key="cycles" flexDirection="row" gap={3}>
@@ -71,9 +71,12 @@ export function drawModels(t: ElementTable, state: GuardState, actions: Actions,
       </Box>
       {recent.length > 0 ? <Text key="recent-head" dimColor>RECENT</Text> : null}
       {recent}
-      <Box key="footer" flexDirection="row" gap={3}>
+      {/* Its own row, wrapping: a long repo name must not push the global save out of a narrow pane. */}
+      <Box key="saves" flexDirection="row" flexWrap="wrap" columnGap={3}>
         <Button key="save" plain hotkey="s" label={`Save for ${repoLabel}`} onPress={actions.save} />
-        <Button key="default" plain hotkey="g" label="Default everywhere" onPress={actions.saveDefault} />
+        <Button key="default" plain hotkey="g" label="Save as global default" onPress={actions.saveDefault} />
+      </Box>
+      <Box key="footer" flexDirection="row" gap={3}>
         <Button key="reset" plain hotkey="r" label="Reset" onPress={actions.reset} />
         <Button key="close" plain hotkey="x" label="Close" role="dismiss" onPress={actions.close} />
       </Box>
@@ -88,6 +91,6 @@ export function textOf(state: GuardState): string {
   return [
     `Models allowed in this session: ${state.allowed.join(', ')} (fallback ${fallback ?? 'none'}, explicit disallowed asks are ${state.mode === 'deny' ? 'refused' : 'swapped'})`,
     ...lines,
-    'Change: /models opus,sonnet · /models save (this repo) · /models default (every repo) · /models reset',
+    'Change: /models opus,sonnet · /models save (this repo) · /models default (global default) · /models reset',
   ].join('\n')
 }

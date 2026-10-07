@@ -408,3 +408,17 @@ describe('answering from the pane', () => {
     expect(JSON.stringify(await term.drawn())).toContain('─'.repeat(12))
   })
 })
+
+describe('VS Code', () => {
+  test('the pane draws and clicks through; the band is not raised there, /progress is the way in', async ($, on) => {
+    engineOf(on, { [`${ROOT}/plans/a-worklog.md`]: SAMPLE })
+    await start($)
+    await progress($, 'plan')
+    const pane = await $.ui.mount({ plugin: 'progress-pane', surface: 'vscode', component: 'Pane', requestId: 'progress', props: { bodyColumns: 64, placement: 'dock', scroll: { offset: 0, bodyRows: 30 } } as never })
+    expect(await pane.find({ key: 'phase-A' })).toBeDefined()
+    await pane.press({ key: 'open-A2' })
+    expect(await pane.find({ text: /DETAILS/ })).toBeDefined()
+    // A proportional font, like the desktop: sections are labels, not rows of ─.
+    expect(JSON.stringify(await pane.drawn())).not.toContain('─'.repeat(12))
+  })
+})

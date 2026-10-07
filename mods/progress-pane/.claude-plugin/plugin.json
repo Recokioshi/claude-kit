@@ -1,6 +1,6 @@
 {
   "name": "progress-pane",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Mission control for long tasks: a validated worklog tool Claude updates at every step (done only after a green gate), facts the mod sees for itself (gate runs, commits, agents, dev servers, context and cost), drift hints where the two disagree, one band line above the prompt and a /progress pane.",
   "author": { "name": "Adrian Gaik" },
   "types": "./types/index.d.ts"

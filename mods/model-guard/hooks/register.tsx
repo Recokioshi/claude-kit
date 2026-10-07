@@ -8,7 +8,7 @@
  * tool.call Workflow: a script naming a disallowed model is refused.
  * classic.PreModelSwitch: /model to a disallowed model is refused.
  * /models: a pane to toggle families, pick the fallback and the mode, and
- * save the choice as this repo's default.
+ * save the choice as this repo's default or as the global default.
  */
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
@@ -117,7 +117,10 @@ async function saveAsDefault($: EngineInterface): Promise<string> {
     }
   }
   if (refused.length) return `Not saved as the global default: ${refused.join('; ')}`
-  return `Saved ${state.allowed.join(', ')} (fallback ${state.fallback ?? 'none'}, explicit asks: ${state.mode}) as the default for every repo without its own saved choice. Repos saved with /models save keep theirs.`
+  // A repo with a saved choice of its own keeps it; one without now follows the global default.
+  await update($, guard, s => (s.repoDefault === null ? { ...s, source: 'config' as const } : s))
+  const own = state.repoDefault === null ? '' : ` ${state.repoName ?? 'This repo'} keeps its own saved choice; /models save (s in the pane) replaces it.`
+  return `Saved ${state.allowed.join(', ')} (fallback ${state.fallback ?? 'none'}, explicit asks: ${state.mode}) as the global default for every repo without its own saved choice.${own}`
 }
 
 /** Back to the repo's saved choice, else the global default. */
@@ -174,7 +177,7 @@ export const register: Register = (on, rawOptions) => {
 
     try {
       // Where nothing draws (cloud, VS Code, -p) the text answer below is the view.
-      await $.ui.open({ id: PANE, title: 'Models', rows: 12 })
+      await $.ui.open({ id: PANE, title: 'Models', rows: 13 })
     } catch {
       // fall through to the text answer
     }

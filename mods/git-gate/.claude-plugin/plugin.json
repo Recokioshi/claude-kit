@@ -1,6 +1,6 @@
 {
   "name": "git-gate",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Git only when you asked: commits, pushes, pull requests, merges and destructive git commands run only when your latest message (or /ship, /kickoff, or your answer to Claude's question) allowed them; everything else is refused with a note telling Claude to ask. No UI.",
   "author": { "name": "Adrian Gaik" },
   "types": "./types/index.d.ts",

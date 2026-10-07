@@ -18,7 +18,8 @@ Tested with Claude Code 2.1.289.
  RECENT
  2m  ~ agent 3f2a91c0  fable → opus
  7m  ✗ lint fixes       haiku refused
- s: Save for web-app   r: Reset   x: Close
+ s: Save for web-app   g: Save as global default
+ r: Reset   x: Close
 ```
 - `1–5` toggle a family. The list can't become empty.
 - `f` cycles the fallback.
@@ -26,13 +27,17 @@ Tested with Claude Code 2.1.289.
   `deny` (Claude gets an error and picks again) or `swap` (it runs on the fallback).
 - `s` saves the current choice (models, fallback, explicit-ask mode) as this repo's default; it is
   read again at every session start and after `/clear`.
-- `g` saves it as the **global default**: every repo without its own saved choice, in every new
-  session. It writes the mod's settings (`pluginConfigs` in `~/.claude/settings.json`), the same
-  values `/plugin configure model-guard@claude-kit` edits, so no file editing is needed.
+- `g` saves it as the **global default**: every repo without its own saved choice uses it, in this
+  session and every new one. A repo saved with `s` keeps its own choice (the confirmation says
+  so; press `s` there to replace it). It writes the mod's settings (`pluginConfigs` in
+  `~/.claude/settings.json`), the same values `/plugin configure model-guard@claude-kit` edits, so
+  no file editing is needed.
+- The header says where the current choice came from: `web-app default`, `global default` or
+  `changed this session`.
 - It works the same on the phone (no dropdowns).
 
 Text forms: `/models opus,sonnet`, `/models save`, `/models default`, `/models reset`. Where nothing draws (cloud
-sessions, VS Code), `/models` prints the same information.
+sessions), `/models` prints the same information.
 
 ## What it enforces
 | Where | What happens to a model that is off |

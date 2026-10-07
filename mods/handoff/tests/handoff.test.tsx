@@ -207,7 +207,7 @@ describe('picking it up in the other repo', () => {
     const w = worldOf(on, { repo: 'api', fork: () => ({ isAnswered: true, text: GOOD }) })
     await start($, w.root)
     await run($, 'consent copy')
-    for (const surface of ['terminal', 'desktop', 'mobile'] as const) {
+    for (const surface of ['terminal', 'desktop', 'mobile', 'vscode'] as const) {
       const ui = await $.ui.mount({ plugin: 'handoff', surface, component: 'Pane', requestId: 'handoff', props: { bodyColumns: 64 } as never })
       expect(await ui.find({ key: 'insert' })).toBeDefined()
       expect(await ui.find({ text: /TL;DR/ })).toBeDefined()

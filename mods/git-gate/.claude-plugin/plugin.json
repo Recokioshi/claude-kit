@@ -1,0 +1,30 @@
+{
+  "name": "git-gate",
+  "version": "0.1.0",
+  "description": "Git only when you asked: commits, pushes, pull requests, merges and destructive git commands run only when your latest message (or /ship, /kickoff, or your answer to Claude's question) allowed them; everything else is refused with a note telling Claude to ask. No UI.",
+  "author": { "name": "Adrian Gaik" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "protectedBranches": {
+      "type": "string",
+      "title": "Protected branches",
+      "description": "Comma-separated branch names or globs that need an explicit merge go-ahead for merges, pushes and commits landing on them.",
+      "required": false,
+      "default": "main,master,production,prod,beta,release/*"
+    },
+    "prBase": {
+      "type": "string",
+      "title": "PR base per repository",
+      "description": "Comma-separated owner/repo=branch pairs; `gh pr create` without --base gets that base.",
+      "required": false,
+      "default": ""
+    },
+    "trustedOrigins": {
+      "type": "string",
+      "title": "Prompt origins that can grant",
+      "description": "Comma-separated prompt origins whose words count as yours: composer (typed), bridge (Remote Control on phone/web), sdk, auto-continuation.",
+      "required": false,
+      "default": "composer,bridge,sdk,auto-continuation"
+    }
+  }
+}

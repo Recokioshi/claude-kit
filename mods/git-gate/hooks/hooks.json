@@ -1,0 +1,1 @@
+{ "description": "git-gate: grants from your words, refusals for git work you did not ask for", "modules": ["./register.ts"] }

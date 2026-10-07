@@ -1,0 +1,1 @@
+{ "description": "model-guard: allow-list per session, enforced on spawns, requests, workflows and /model", "modules": ["./register.tsx"] }

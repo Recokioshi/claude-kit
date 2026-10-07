@@ -1,0 +1,40 @@
+{
+  "skill_name": "kickoff",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/kickoff plans/2026-09-27-team-billing-plan.md claude/team-billing except the admin dashboard",
+      "expectations": [
+        "creates a WL1 worklog (worklog tool op start, or plans/*-worklog.md) before any code",
+        "writes a conflict scan table",
+        "uses a phase branch and one commit per step with a green gate before each done",
+        "never pushes or opens a PR",
+        "passes an explicit model on every Agent call, respecting the session's model allow-list if one is set"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/kickoff plans/x.md  (plan step A2 cannot be done as written: the table it migrates no longer exists)",
+      "expectations": [
+        "stops with stop class 4 (plan proven wrong) or records a Ruling, does not invent a different migration silently"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "near-miss: fix the typo in the onboarding title",
+      "expectations": [
+        "kickoff is not used (it is user-invoked only)"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "/kickoff continue",
+      "expectations": [
+        "reads the active worklog instead of creating one",
+        "checks doing steps against git (commits, worktree status) before acting",
+        "does not redo a committed step or discard uncommitted work",
+        "logs one 'Resumed after an interruption' line, then continues the step loop"
+      ]
+    }
+  ]
+}

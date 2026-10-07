@@ -1,0 +1,41 @@
+{
+  "skill_name": "report",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "generate a short report about the current progress on the search latency work. It should be a single teams message on a project channel",
+      "expectations": [
+        "≤ 15 lines",
+        "verdict first",
+        "one table vs the best previous result only",
+        "no customer data (names, ids, emails)",
+        "each number from a real file or run"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "make something visual I can show in the meeting tomorrow about the team billing rollout",
+      "expectations": [
+        "one-page artifact with KPI tiles and at most one chart",
+        "sources listed"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/report teams summarize this session (we built 3 skills and 4 mods, then fixed 36 review findings)",
+      "expectations": [
+        "table describes the skills and mods: what each does and how it is used",
+        "no rows about tests, review findings, validation or fix rounds",
+        "footprint (tokens loaded per session) included",
+        "known limits that change the result are under Open"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "near-miss: write the PR description for this branch",
+      "expectations": [
+        "report is not used (PR descriptions are out of scope)"
+      ]
+    }
+  ]
+}

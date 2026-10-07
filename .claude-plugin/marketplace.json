@@ -1,0 +1,47 @@
+{
+  "name": "claude-kit",
+  "owner": {
+    "name": "Adrian Gaik"
+  },
+  "metadata": {
+    "description": "Claude Code mods for long autonomous runs: git only when you ask (git-gate), live progress with mid-run answers (progress-pane), a model allow-list (model-guard) and handoffs between repos (handoff)."
+  },
+  "plugins": [
+    {
+      "name": "git-gate",
+      "source": "./mods/git-gate",
+      "description": "Git only when you asked: commits, pushes, pull requests, merges and destructive git commands run only when your latest message (or /ship, /kickoff, or your answer to Claude's question) allowed them; everything else is refused with a note telling Claude to ask. No UI.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Gaik"
+      }
+    },
+    {
+      "name": "model-guard",
+      "source": "./mods/model-guard",
+      "description": "Choose the models this session may use: /models toggles Opus, Sonnet, Haiku, Fable and others; subagents and workflows asking for a model that is off are refused (or swapped), requests still on one are swapped to the fallback, and /model to one is refused. Save the choice per repository.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Gaik"
+      }
+    },
+    {
+      "name": "progress-pane",
+      "source": "./mods/progress-pane",
+      "description": "Mission control for long tasks: a validated worklog tool Claude updates at every step (done only after a green gate), facts the mod sees for itself (gate runs, commits, agents, dev servers, context and cost), drift hints where the two disagree, one band line above the prompt and a /progress pane.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Gaik"
+      }
+    },
+    {
+      "name": "handoff",
+      "source": "./mods/handoff",
+      "description": "Hand work to another session or repo without copy-paste: /handoff writes a note from facts it gathers itself (branch, commits, PRs, worklog) plus a six-section narrative from a fork of the conversation, saves it under ~/.claude/handoffs, copies it, and /handoff pick inserts it in the other session; a waiting note for this repo shows as a toast.",
+      "version": "0.1.0",
+      "author": {
+        "name": "Adrian Gaik"
+      }
+    }
+  ]
+}

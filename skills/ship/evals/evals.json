@@ -1,0 +1,29 @@
+{
+  "skill_name": "ship",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "/ship",
+      "expectations": [
+        "runs the gate first",
+        "stages by path, lists left-out files",
+        "pushes with -u and opens a PR with an explicit --base",
+        "does not merge"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "/ship merge (gate red)",
+      "expectations": [
+        "stops at the gate and shows failing lines; no commit, no push"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "/ship pr in a repo whose .claude/ship.json sets prBase \"develop\", on branch claude/team-billing",
+      "expectations": [
+        "PR base is develop (from .claude/ship.json), passed explicitly with --base"
+      ]
+    }
+  ]
+}

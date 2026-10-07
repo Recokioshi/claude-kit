@@ -1,0 +1,32 @@
+{
+  "name": "model-guard",
+  "version": "0.1.0",
+  "description": "Choose the models this session may use: /models toggles Opus, Sonnet, Haiku, Fable and others; subagents and workflows asking for a model that is off are refused (or swapped), requests still on one are swapped to the fallback, and /model to one is refused. Save the choice per repository.",
+  "author": { "name": "Adrian Gaik" },
+  "types": "./types/index.d.ts",
+  "userConfig": {
+    "defaultAllowed": {
+      "type": "string",
+      "title": "Allowed by default",
+      "description": "Comma-separated families allowed when a repo has no saved choice: opus, sonnet, haiku, fable, other. All by default.",
+      "required": false,
+      "default": "opus,sonnet,haiku,fable,other"
+    },
+    "fallback": {
+      "type": "string",
+      "title": "Fallback model",
+      "description": "Where requests on a model that is off go.",
+      "required": false,
+      "default": "opus",
+      "options": ["opus", "sonnet", "fable", "haiku"]
+    },
+    "mode": {
+      "type": "string",
+      "title": "Explicit asks for a model that is off",
+      "description": "deny: refuse the spawn so Claude picks again; swap: run it on the fallback.",
+      "required": false,
+      "default": "deny",
+      "options": ["deny", "swap"]
+    }
+  }
+}

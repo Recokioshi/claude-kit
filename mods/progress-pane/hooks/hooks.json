@@ -1,0 +1,1 @@
+{ "description": "progress-pane: worklog tool, observation, drift, band and pane", "modules": ["./register.tsx"] }

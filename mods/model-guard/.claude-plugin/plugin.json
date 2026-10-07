@@ -1,7 +1,7 @@
 {
   "name": "model-guard",
-  "version": "0.1.0",
-  "description": "Choose the models this session may use: /models toggles Opus, Sonnet, Haiku, Fable and others; subagents and workflows asking for a model that is off are refused (or swapped), requests still on one are swapped to the fallback, and /model to one is refused. Save the choice per repository.",
+  "version": "0.2.0",
+  "description": "Choose the models this session may use: /models toggles Opus, Sonnet, Haiku, Fable and others; subagents and workflows asking for a model that is off are refused (or swapped), requests still on one are swapped to the fallback, and /model to one is refused. Save the choice per repository or as the global default.",
   "author": { "name": "Adrian Gaik" },
   "types": "./types/index.d.ts",
   "userConfig": {

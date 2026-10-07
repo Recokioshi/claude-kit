@@ -69,8 +69,17 @@ Claude Code session afterwards (or run `/reload-plugins`).
   move, run `./install.sh` again from the new place.
 
 **Cloud sessions** (claude.ai/code) don't read your `~/.claude`. To use a skill there, commit
-it to the repo's `.claude/skills/`. Mods don't draw in cloud sessions or VS Code; their commands
-answer in text there.
+it to the repo's `.claude/skills/`. Mods don't draw in cloud sessions; their commands answer in
+text there.
+
+**Where each part shows up:**
+
+| | Terminal | Desktop app | VS Code extension | Mobile (Remote Control) | Cloud session |
+|---|---|---|---|---|---|
+| Skills | ✓ | ✓ | ✓ | ✓ | from the repo's `.claude/skills/` |
+| git-gate, model-guard enforcement | ✓ | ✓ | ✓ | ✓ | – |
+| Panes (`/progress`, `/models`, `/handoff`) | ✓ | ✓ | ✓ | ✓ | text answers |
+| progress band above the prompt | ✓ | ✓ | – (use `/progress`) | – | – |
 
 ## How the pieces work together
 - **`/kickoff`** writes the worklog through progress-pane's tool (a validated format: a step is

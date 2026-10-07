@@ -71,8 +71,11 @@ contract. It stays the same text, so it doesn't break the prompt cache. After `/
   rules would wrap).
 - It is the same on the phone.
 
-**Text**: `/progress text` prints the overview as Markdown, for cloud sessions and VS Code,
-where nothing draws.
+**VS Code**: the band above the prompt is drawn only in the terminal and the desktop app; in VS Code
+open the pane with `/progress`.
+
+**Text**: `/progress text` prints the overview as Markdown, for cloud sessions and anywhere
+nothing draws.
 
 ## Commands
 - `/progress`: open the pane. `/progress plan`: the whole plan. `/progress B6`: that step's details.

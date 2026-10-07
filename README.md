@@ -48,13 +48,13 @@ claude-kit  pick what to install (↑↓ move · space toggle · a all · n none
     [ ] model-guard    —           /models: choose which models Claude and its agents may use
     [ ] handoff        —           /handoff: carry a task's state to another repo or session
 ```
-It then shows the plan (install, update, remove) and asks before applying it. Start a new
-Claude Code session afterwards (or run `/reload-plugins`).
+It then shows the plan (install, update, remove) and asks before applying it. Afterwards, start
+a new session in the desktop app; in a terminal session, `/reload-plugins` is enough.
 
 | To | Run |
 |---|---|
 | change your picks (add or remove) | `./install.sh` |
-| update after a `git pull` | `./install.sh` (enter keeps your picks) |
+| update after a `git pull` | `./install.sh` (enter keeps your picks), then a new session in the desktop app or `/reload-plugins` in the terminal |
 | install everything without questions | `./install.sh --all` |
 | install specific ones | `./install.sh --select kickoff,git-gate --yes` |
 | see what is installed | `./install.sh --list` |
@@ -65,8 +65,10 @@ Claude Code session afterwards (or run `/reload-plugins`).
   of the same name that you made yourself is never overwritten (unless `--force`, which moves
   yours to `~/.claude/skills-backup/`).
 - **Mods** are installed from this folder through a local plugin marketplace named
-  `claude-kit` and are **read in place**. Moving or deleting the folder breaks them; after a
-  move, run `./install.sh` again from the new place.
+  `claude-kit`. Terminal sessions **read them in place**; the desktop app runs a copy in
+  `~/.claude/plugins/cache/claude-kit/`, which `./install.sh` refreshes when a mod's version
+  changed (it tells you when files changed but the version did not). Moving or deleting the
+  folder breaks them; after a move, run `./install.sh` again from the new place.
 
 **Cloud sessions** (claude.ai/code) don't read your `~/.claude`. To use a skill there, commit
 it to the repo's `.claude/skills/`. Mods don't draw in cloud sessions; their commands answer in

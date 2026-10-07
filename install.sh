@@ -11,8 +11,11 @@
 #            yours is moved to ~/.claude/skills-backup/)
 #
 # Skills are copied to ~/.claude/skills/<name> (re-run after `git pull` to update them).
-# Mods are read from this folder through a local marketplace named "claude-kit": keep the folder
-# where it is; edits and `git pull` apply after /reload-plugins.
+# Mods are installed from this folder through a local marketplace named "claude-kit": keep the folder
+# where it is. Terminal sessions read them from it, so edits and `git pull` apply after /reload-plugins.
+# The desktop app runs the copy in ~/.claude/plugins/cache/claude-kit/<mod>/<version>/ instead, which
+# this script refreshes (`claude plugin update`) when the version in the mod's plugin.json changed;
+# start a new session afterwards. Changed files under an unchanged version stay old there.
 # Works with the bash 3.2 that macOS ships.
 set -euo pipefail
 
@@ -56,7 +59,7 @@ while [ $# -gt 0 ]; do
     --list) MODE=list; shift ;;
     --yes|-y) YES=1; shift ;;
     --force) FORCE=1; shift ;;
-    -h|--help) sed -n '2,15p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,18p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) echo "unknown option: $1 (see --help)" >&2; exit 2 ;;
   esac
 done
@@ -68,10 +71,11 @@ else
 fi
 
 # ── what is installed ────────────────────────────────────────────────────────
-HAS_CLAUDE=0; PLUGIN_LIST=""
+HAS_CLAUDE=0; PLUGIN_LIST=""; PLUGIN_JSON=""
 if command -v claude >/dev/null 2>&1; then
   HAS_CLAUDE=1
   PLUGIN_LIST="$(claude plugin list 2>/dev/null || true)"
+  PLUGIN_JSON="$(claude plugin list --json 2>/dev/null || true)"
 fi
 
 # skill: installed (ours) | foreign (same name, not from this kit) | none
@@ -84,8 +88,51 @@ skill_state() {
 mod_state() { if printf '%s\n' "$PLUGIN_LIST" | grep -q "$1@$MARKET"; then echo installed; else echo none; fi; }
 state_of() { if [ "${KINDS[$1]}" = skill ]; then skill_state "${NAMES[$1]}"; else mod_state "${NAMES[$1]}"; fi; }
 
-STATES=()
-for i in $(seq 0 $((COUNT - 1))); do STATES+=("$(state_of "$i")"); done
+# The desktop app runs an installed mod's copy in ~/.claude/plugins/cache/claude-kit/<mod>/<version>/.
+# `claude plugin update` refreshes it only when the version in the mod's plugin.json changed.
+kit_version() { grep -m1 '"version"' "$KIT/mods/$1/.claude-plugin/plugin.json" 2>/dev/null | sed 's/.*"version"[^"]*"\([^"]*\)".*/\1/' || true; }
+# "<version>|<path>" of the installed copy. Only the JSON list has it: the text list shows the
+# folder's version.
+mod_copy() {
+  printf '%s\n' "$PLUGIN_JSON" | tr '{},' '\n\n\n' | awk -F'"' -v id="$1@$MARKET" '
+    $2 == "id" { on = ($4 == id) }
+    on && $2 == "version" && v == "" { v = $4 }
+    on && $2 == "installPath" && p == "" { p = $4 }
+    END { if (v != "" && p != "") print v "|" p }' || true
+}
+# "<state> <installed version> <folder version>", state: current | behind (versions differ) |
+# changed (same version, different files: the copy stays old) | unknown
+copy_state() {
+  local n="$1" copy iv kv cache
+  copy="$(mod_copy "$n")"; kv="$(kit_version "$n")"
+  if [ -z "$copy" ] || [ -z "$kv" ]; then echo unknown; return; fi
+  iv="${copy%%|*}"; cache="${copy#*|}"
+  if [ "$iv" != "$kv" ]; then echo "behind $iv $kv"; return; fi
+  if [ ! -d "$cache" ]; then echo unknown
+  elif diff -rq -x .claude-plugin -x .in_use -x .DS_Store "$cache" "$KIT/mods/$n" >/dev/null 2>&1 \
+    && cmp -s "$cache/.claude-plugin/plugin.json" "$KIT/mods/$n/.claude-plugin/plugin.json"; then echo "current $iv $kv"
+  else echo "changed $iv $kv"; fi
+}
+
+STATES=(); COPIES=()
+for i in $(seq 0 $((COUNT - 1))); do
+  STATES+=("$(state_of "$i")")
+  if [ "${KINDS[$i]}" = mod ] && [ "${STATES[$i]}" = installed ]; then COPIES+=("$(copy_state "${NAMES[$i]}")"); else COPIES+=(""); fi
+done
+
+# A note on the desktop app's copy, for --list and (with "plan") the plan.
+copy_note() {
+  local state iv kv
+  read -r state iv kv <<<"${COPIES[$1]}"
+  case "$state" in
+    behind)
+      if [ "${2:-}" = plan ]; then printf '  %s(desktop app copy: %s → %s)%s' "$D" "$iv" "$kv" "$N"
+      else printf '  %s(desktop app copy %s, folder %s: run ./install.sh)%s' "$Y" "$iv" "$kv" "$N"; fi ;;
+    changed) printf '  %s(files changed but the version is still %s: the desktop app keeps its old copy)%s' "$Y" "$iv" "$N" ;;
+    current) [ "${2:-}" = plan ] && printf '  %s(%s, up to date)%s' "$D" "$iv" "$N" ;;
+  esac
+  return 0
+}
 
 # Fixed width (10 columns) so the next column lines up, colors or not.
 status_text() {
@@ -99,7 +146,7 @@ status_text() {
 if [ "$MODE" = list ]; then
   printf '%sclaude-kit%s  %s\n\n' "$B" "$N" "$KIT"
   for i in $(seq 0 $((COUNT - 1))); do
-    printf '  %-6s %-14s %s  %s\n' "${KINDS[$i]}" "${NAMES[$i]}" "$(status_text "${STATES[$i]}")" "${DESCS[$i]}"
+    printf '  %-6s %-14s %s  %s%s\n' "${KINDS[$i]}" "${NAMES[$i]}" "$(status_text "${STATES[$i]}")" "${DESCS[$i]}" "$(copy_note "$i")"
   done
   exit 0
 fi
@@ -262,6 +309,7 @@ for t in "${TODO[@]}"; do
     skip) mark="${Y}!${N} skip   " ;;
   esac
   note=""; [ "$a" = skip ] && note="  ${D}(~/.claude/skills/${NAMES[$i]} exists and is not from this kit; --force replaces it and moves yours to ~/.claude/skills-backup/)${N}"
+  [ "$a" = update ] && note="$(copy_note "$i" plan)"
   printf '  %s %-5s %s%s\n' "$mark" "${KINDS[$i]}" "${NAMES[$i]}" "$note"
 done
 if [ "$YES" -eq 0 ]; then
@@ -300,17 +348,36 @@ ensure_market() {
 }
 
 echo
-fail=0
+fail=0; stale=""
 for t in "${TODO[@]}"; do
   a="${t%%|*}"; i="${t#*|}"; k="${KINDS[$i]}"; n="${NAMES[$i]}"
   case "$k:$a" in
     skill:install|skill:update) install_skill "$n" && echo "  ${G}✓${N} skill $n → ~/.claude/skills/$n" ;;
     skill:remove) remove_skill "$n" && echo "  ${G}✓${N} skill $n removed" ;;
-    mod:install|mod:update)
+    mod:install)
       ensure_market
       claude plugin install "$n@$MARKET" >/dev/null 2>&1 || true
       PLUGIN_LIST="$(claude plugin list 2>/dev/null || true)"
       if [ "$(mod_state "$n")" = installed ]; then echo "  ${G}✓${N} mod $n"; else echo "  ${R}✗${N} mod $n: install failed (try: claude plugin install $n@$MARKET)"; fail=1; fi
+      ;;
+    mod:update)
+      # `plugin install` leaves an installed mod's copy as it is; `plugin update` replaces it
+      # when the version in plugin.json changed and does nothing otherwise.
+      ensure_market
+      claude plugin update "$n@$MARKET" >/dev/null 2>&1 || true
+      PLUGIN_LIST="$(claude plugin list 2>/dev/null || true)"
+      PLUGIN_JSON="$(claude plugin list --json 2>/dev/null || true)"
+      read -r was from to <<<"${COPIES[$i]}"
+      read -r now iv kv <<<"$(copy_state "$n")"
+      case "$now" in
+        current) if [ "$was" = behind ]; then echo "  ${G}✓${N} mod $n $from → $to"; else echo "  ${G}✓${N} mod $n ${D}($iv, up to date)${N}"; fi ;;
+        changed)
+          echo "  ${Y}!${N} mod $n: files changed but the version is still $iv, so the desktop app keeps its old copy."
+          echo "    To ship them there, bump \"version\" in mods/$n/.claude-plugin/plugin.json (and in .claude-plugin/marketplace.json), then run ./install.sh again."
+          stale="$stale $n" ;;
+        behind) echo "  ${R}✗${N} mod $n: the desktop app's copy is still $iv (try: claude plugin update $n@$MARKET)"; fail=1 ;;
+        *) if [ "$(mod_state "$n")" = installed ]; then echo "  ${G}✓${N} mod $n"; else echo "  ${R}✗${N} mod $n: update failed (try: claude plugin install $n@$MARKET)"; fail=1; fi ;;
+      esac
       ;;
     mod:remove)
       if claude plugin uninstall "$n@$MARKET" >/dev/null 2>&1; then echo "  ${G}✓${N} mod $n removed"; else echo "  ${R}✗${N} mod $n: could not remove (try: claude plugin uninstall $n@$MARKET)"; fail=1; fi
@@ -326,6 +393,7 @@ if [ $HAS_CLAUDE -eq 1 ]; then
 fi
 
 echo
-echo "Done. Start a new Claude Code session (or run /reload-plugins) to load the changes."
+echo "Done. To load the changes: in the desktop app, start a new session; in a terminal session, run /reload-plugins."
+[ -n "$stale" ] && echo "${Y}!${N} The desktop app keeps its old copy of:$stale (bump the version, see above)."
 echo "${D}Update later: git pull && ./install.sh   ·   change your picks: ./install.sh   ·   remove all: ./install.sh --uninstall${N}"
 exit $fail

@@ -11,7 +11,8 @@ install.sh          the installer; its CATALOG lists every item with a one-line 
 ```
 
 ## Working on a mod
-Work in your clone; the installed mods are read from it.
+Work in your clone. Terminal sessions read the installed mods from it; the desktop app runs a
+copy (step 3).
 1. Edit `mods/<name>/hooks/…`.
 2. Check:
    ```bash
@@ -21,7 +22,13 @@ Work in your clone; the installed mods are read from it.
    npx tsc -p .                      # types; needs .claude-plugin/types, which the engine
                                      # writes the first time it loads the mod
    ```
-3. Try it: `/reload-plugins` in a Claude Code session.
+3. Try it:
+   - Terminal (`claude`): `/reload-plugins` reads the mod from your clone.
+   - Desktop app: sessions run the copy in `~/.claude/plugins/cache/claude-kit/<name>/<version>/`,
+     and `/reload-plugins` or reopening the app reloads that copy, not your edits. Bump `version` in
+     `mods/<name>/.claude-plugin/plugin.json` and in the mod's entry in `.claude-plugin/marketplace.json`,
+     run `claude plugin update <name>@claude-kit` (it does nothing while the version is unchanged),
+     then start a new session.
 
 Loader rules worth knowing (the engine reads the source before running it):
 - `$` calls are spelled `$.noun.method(...)` literally; helpers that take `$` are top-level

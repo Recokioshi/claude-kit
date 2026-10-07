@@ -85,7 +85,10 @@ skill_state() {
   elif [ -e "$dest" ]; then echo foreign
   else echo none; fi
 }
-mod_state() { if printf '%s\n' "$PLUGIN_LIST" | grep -q "$1@$MARKET"; then echo installed; else echo none; fi; }
+# Names of the installed mods from this marketplace, matched on the whole id: "x@claude-kit-local"
+# is from another marketplace.
+kit_mods() { printf '%s\n' "$PLUGIN_LIST" | grep -Eo '[A-Za-z0-9_.-]+@[A-Za-z0-9_.-]+' | sed -n "s/@$MARKET\$//p" | sort -u || true; }
+mod_state() { if kit_mods | grep -qxF "$1"; then echo installed; else echo none; fi; }
 state_of() { if [ "${KINDS[$1]}" = skill ]; then skill_state "${NAMES[$1]}"; else mod_state "${NAMES[$1]}"; fi; }
 
 # The desktop app runs an installed mod's copy in ~/.claude/plugins/cache/claude-kit/<mod>/<version>/.
@@ -274,11 +277,15 @@ fi
 
 # Another folder already registered as the "claude-kit" marketplace (an older copy, a
 # personal fork)? Installing points the name here, and mods only that folder has stop loading.
+# -ef: the same folder reached by another path (a symlink) is not another folder.
 if [ $needs_claude -eq 1 ]; then
-  other="$(claude plugin marketplace list 2>/dev/null | awk -v m="> $MARKET" '$0 ~ m"$" {getline; if (match($0, /Folder \(.*\)/)) print substr($0, RSTART + 8, RLENGTH - 9)}' | head -1 || true)"
-  if [ -n "$other" ] && [ "$other" != "$KIT" ] && [ -d "$other" ]; then
+  other="$(claude plugin marketplace list --json 2>/dev/null | tr '{},' '\n\n\n' | awk -F'"' -v m="$MARKET" '
+    $2 == "name" { on = ($4 == m) }
+    on && $2 == "path" && p == "" { p = $4 }
+    END { if (p != "") print p }' || true)"
+  if [ -n "$other" ] && [ -d "$other" ] && ! [ "$other" -ef "$KIT" ]; then
     lost=""
-    for p in $(printf '%s\n' "$PLUGIN_LIST" | grep -Eo "[A-Za-z0-9_.-]+@$MARKET" | sed "s/@$MARKET//" | sort -u); do
+    for p in $(kit_mods); do
       [ -d "$KIT/mods/$p" ] || lost="$lost $p"
     done
     echo
@@ -389,7 +396,7 @@ done
 # No mod left: drop the marketplace too.
 if [ $HAS_CLAUDE -eq 1 ]; then
   PLUGIN_LIST="$(claude plugin list 2>/dev/null || true)"
-  if ! printf '%s\n' "$PLUGIN_LIST" | grep -q "@$MARKET"; then claude plugin marketplace remove "$MARKET" >/dev/null 2>&1 || true; fi
+  if [ -z "$(kit_mods)" ]; then claude plugin marketplace remove "$MARKET" >/dev/null 2>&1 || true; fi
 fi
 
 echo

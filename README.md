@@ -26,6 +26,11 @@ and a short contract while a worklog is active.
 - Claude Code **2.1.287 or newer** (mods need it; check with `claude --version`, update with
   `claude update`). Mods are an early-access feature: re-run the tests after a Claude Code update.
 - macOS or Linux, bash (the 3.2 that macOS ships is fine).
+- Windows: use WSL, with Claude Code installed inside it, and clone the kit from the WSL shell
+  (e.g. `~/claude-kit`, not a folder under `/mnt/c`). Everything then works in Claude Code sessions
+  inside WSL. The Windows desktop app reads `%USERPROFILE%\.claude`, not WSL's `~/.claude`, so it
+  doesn't see what the installer sets up there. Native Windows (Git Bash, PowerShell) is not
+  supported: the mods assume `/` in paths, and git-gate only checks commands run through the Bash tool.
 
 ## Install
 ```bash

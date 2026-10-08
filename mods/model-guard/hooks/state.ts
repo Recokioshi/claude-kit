@@ -6,7 +6,7 @@
  */
 import { EMPTY_CATALOG, familiesOf } from './catalog'
 import type { Catalog, CatalogEntry } from './catalog'
-import { familyOfKey } from './ids'
+import { aliasOf, familyOfKey, keyOf, KNOWN_FAMILIES } from './ids'
 import { allowedEntries, decisionFor, DEFAULT_POLICY, fallbackEntry, withVersion } from './policy'
 import type { Policy } from './policy'
 
@@ -156,4 +156,31 @@ export function ageOf(ms: number): string {
   const h = Math.floor(m / 60)
   if (h < 48) return `${h}h${m % 60 ? `${m % 60}m` : ''}`
   return `${Math.floor(h / 24)}d`
+}
+
+/** What a request names, for messages and stats: `opus` for an alias, `opus-5` for an id. */
+export function nameOf(model: string): string {
+  return aliasOf(model)?.family ?? keyOf(model)
+}
+
+/** The refusal Claude reads: what is blocked, and what to ask for instead. */
+export function refusalOf(policy: Policy, asked: string, target: string | null): string {
+  const instead = target === null ? 'No allowed model is known yet; ask the user to open /models.' : `Spawn the agent again with model "${target}".`
+  return `model-guard: ${labelOf(nameOf(asked))} is blocked in this session (blocked: ${blockedOf(policy).join(', ') || 'nothing else'}). ${instead}`
+}
+
+/** The toast for a model the list did not have before. */
+export function newModelText(policy: Policy, entry: CatalogEntry): string {
+  const on = decisionFor(policy, entry.key, entry.family) === 'allow'
+  return `model-guard: new model ${entry.displayName ?? labelOf(entry.key)} (${entry.ids[0] ?? entry.key}), ${on ? 'allowed' : 'blocked'}. /models to change.`
+}
+
+/** Why a 0.2-style family list can't be used (an unknown word, or nothing), else null. */
+export function familyListProblem(words: readonly string[], catalog: Catalog): string | null {
+  const known = new Set<string>([...KNOWN_FAMILIES, ...familiesOf(catalog), 'other'])
+  const unknown = words.filter(w => !known.has(w))
+  if (words.length > 0 && unknown.length === 0) {
+    return null
+  }
+  return `No model family in "${unknown.join(' ') || words.join(' ')}". Use any of: ${[...known].join(', ')}.`
 }

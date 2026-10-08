@@ -3,7 +3,8 @@
  *
  * The lists (the rules and the model list) live in the plugin store, shared
  * by every local Claude Code process: desktop, terminals, VS Code. Each
- * session reads them at start, at every turn and when /models opens.
+ * session reads them at start, at every turn and when /models opens; the
+ * model list refreshes from Anthropic's Models API once a day.
  *
  * agent.spawn: a subagent asked for on a blocked version is refused (or
  * swapped, by mode); an alias (`opus`) is pointed at the newest allowed
@@ -18,66 +19,56 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
-import { familiesOf, mergeCatalog, parseCatalog } from './catalog'
-import type { Catalog, Incoming } from './catalog'
-import { aliasOf, familyOfId, isInherited, keyOf, KNOWN_FAMILIES, splitSuffix } from './ids'
-import { concreteFor, isAllowedModel, migratePolicy, parsePolicy, swapTarget, withFamilyList } from './policy'
+import type { Catalog, Incoming, Result } from './catalog'
+import { aliasOf, familyOfId, isInherited, keyOf, parseModelId, splitSuffix } from './ids'
+import { addSeen, API_VERSION, changeList, fetchModels, GLOBAL_KEY, isStale, messageOf, readLists, repoKeyOf, saveFetched } from './lists'
+import type { StorePort } from './lists'
+import { concreteFor, isAllowedModel, migratePolicy, swapTarget, withFamilyList } from './policy'
 import type { LegacyOptions, Policy } from './policy'
-import { blockedOf, cycledFallback, EMPTY_STATE, isCurrent, labelOf, summaryOf, toggledVersion, withEvent, withUse, workflowModels } from './state'
+import {
+  blockedOf,
+  cycledFallback,
+  EMPTY_STATE,
+  familyListProblem,
+  isCurrent,
+  labelOf,
+  nameOf,
+  newModelText,
+  refusalOf,
+  summaryOf,
+  toggledVersion,
+  withEvent,
+  withUse,
+  workflowModels,
+} from './state'
 import type { GuardState } from './state'
 import { drawModels, textOf } from './view'
 
 const PANE = 'models'
-const GLOBAL = 'policy:global'
-const CATALOG = 'catalog'
+const KEEP_ONE = 'Something must stay allowed: allow another model first.'
+const NO_LOGIN = 'no Anthropic login in this session (Bedrock, Vertex or a gateway); the list holds the models seen in use'
 const guard = atom({ plugin: 'model-guard', key: 'guard' } as const, EMPTY_STATE)
 
-const repoKeyOf = (root: string) => `repo:${root}`
-
-/** What a request names, for messages and stats: `opus` for an alias, `opus-5` for an id. */
-function nameOf(model: string): string {
-  return aliasOf(model)?.family ?? keyOf(model)
+/** The store as plain functions, for lists.ts. */
+function storeOf($: EngineInterface): StorePort {
+  return { get: key => $.store.get(key), set: (key, value) => $.store.set(key, value), delete: key => $.store.delete(key) }
 }
 
-/**
- * Reads the lists from the store into the session. A global list that does
- * not exist yet is seeded from the 0.2 settings rows; a 0.2 repo record is
- * migrated and written back.
- */
-async function loadLists($: EngineInterface, legacy: LegacyOptions): Promise<GuardState> {
-  let root: string | null = null
+/** The session's folder: its repo root, else its working directory. */
+async function rootOf($: EngineInterface): Promise<string | null> {
   try {
-    root = (await $.session.repo())?.root ?? (await $.session.cwd())
+    return (await $.session.repo())?.root ?? (await $.session.cwd())
   } catch {
-    root = null
+    return null
   }
-  let global = parsePolicy(await $.store.get(GLOBAL))
-  if (global === null) {
-    global = migratePolicy(undefined, legacy)
-    await $.store.set(GLOBAL, global)
-  }
-  let repo: Policy | null = null
-  if (root !== null) {
-    const stored = await $.store.get(repoKeyOf(root))
-    if (stored !== undefined && stored !== null) {
-      repo = parsePolicy(stored)
-      if (repo === null) {
-        repo = migratePolicy(stored, legacy)
-        await $.store.set(repoKeyOf(root), repo)
-      }
-    }
-  }
-  const catalog = parseCatalog(await $.store.get(CATALOG))
+}
+
+/** Reads the lists from the store into the session. */
+async function loadLists($: EngineInterface, legacy: LegacyOptions): Promise<GuardState> {
+  const root = await rootOf($)
+  const lists = await readLists(storeOf($), root, legacy)
   const repoName = root === null ? null : (root.split('/').filter(Boolean).pop() ?? null)
-  await update($, guard, s => ({
-    ...(isCurrent(s) ? s : EMPTY_STATE),
-    isReady: true,
-    policy: repo ?? global,
-    source: repo === null ? ('global' as const) : ('repo' as const),
-    repoRoot: root,
-    repoName,
-    catalog,
-  }))
+  await update($, guard, s => ({ ...(isCurrent(s) ? s : EMPTY_STATE), ...lists, isReady: true, repoRoot: root, repoName }))
   return read($, guard)
 }
 
@@ -96,27 +87,14 @@ async function ensureReady($: EngineInterface, legacy: LegacyOptions): Promise<G
   }
 }
 
-const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
-
-/**
- * Applies one change to the active list (this repo's override, else the
- * global one): read again from the store, since another process may have
- * changed it, changed, and written back.
- */
+/** One change to the list in force (this repo's own, else the global one). */
 async function changePolicy($: EngineInterface, change: (policy: Policy, catalog: Catalog) => Policy): Promise<{ isChanged: boolean }> {
   const state = await read($, guard)
-  const key = state.source === 'repo' && state.repoRoot !== null ? repoKeyOf(state.repoRoot) : GLOBAL
-  const current = parsePolicy(await $.store.get(key)) ?? state.policy
-  const next = change(current, state.catalog)
-  const isChanged = next !== current
-  if (isChanged) {
-    await $.store.set(key, next)
-  }
-  await update($, guard, s => ({ ...s, policy: next }))
+  const key = state.source === 'repo' && state.repoRoot !== null ? repoKeyOf(state.repoRoot) : GLOBAL_KEY
+  const { policy, isChanged } = await changeList(storeOf($), key, state.policy, p => change(p, state.catalog))
+  await update($, guard, s => ({ ...s, policy }))
   return { isChanged }
 }
-
-const KEEP_ONE = 'Something must stay allowed: allow another model first.'
 
 /** A pane change; a refused one (it would block the last allowed model) says why. */
 async function changeFromPane($: EngineInterface, change: (policy: Policy, catalog: Catalog) => Policy): Promise<void> {
@@ -126,19 +104,11 @@ async function changeFromPane($: EngineInterface, change: (policy: Policy, catal
   }
 }
 
-/** The pane's repo button: a list of its own, or back to the global one. */
-async function toggleRepoList($: EngineInterface, legacy: LegacyOptions): Promise<void> {
-  const state = await read($, guard)
-  $.ui.toast(state.source === 'repo' ? await useGlobalList($, legacy) : await useRepoList($))
-}
-
 /** `/models opus,sonnet` (the 0.2 form): listed families allow, the others block. */
 async function setFamilyList($: EngineInterface, words: string[]): Promise<string> {
-  const state = await read($, guard)
-  const known = new Set<string>([...KNOWN_FAMILIES, ...familiesOf(state.catalog), 'other'])
-  const unknown = words.filter(w => !known.has(w))
-  if (words.length === 0 || unknown.length > 0) {
-    return `No model family in "${unknown.join(' ') || words.join(' ')}". Use any of: ${[...known].join(', ')}.`
+  const problem = familyListProblem(words, (await read($, guard)).catalog)
+  if (problem !== null) {
+    return problem
   }
   const { isChanged } = await changePolicy($, (p, c) => withFamilyList(p, c, words))
   return isChanged ? textOf(await read($, guard)) : KEEP_ONE
@@ -147,55 +117,78 @@ async function setFamilyList($: EngineInterface, words: string[]): Promise<strin
 /** Gives this repo a list of its own, a copy of the one in force. */
 async function useRepoList($: EngineInterface): Promise<string> {
   const state = await read($, guard)
-  if (state.repoRoot === null) {
-    return 'This session has no folder to keep a list for.'
-  }
-  if (state.source === 'repo') {
-    return `${state.repoName ?? 'This repo'} already has its own list. /models global goes back to the global one.`
-  }
+  const name = state.repoName ?? 'This repo'
+  if (state.repoRoot === null) return 'This session has no folder to keep a list for.'
+  if (state.source === 'repo') return `${name} already has its own list. /models global goes back to the global one.`
   await $.store.set(repoKeyOf(state.repoRoot), state.policy)
   await update($, guard, s => ({ ...s, source: 'repo' as const }))
-  return `${state.repoName ?? 'This repo'} now has its own list, a copy of the global one. /models global goes back.`
+  return `${name} now has its own list, a copy of the global one. /models global goes back.`
 }
 
 /** Drops this repo's own list; the global one applies again. */
 async function useGlobalList($: EngineInterface, legacy: LegacyOptions): Promise<string> {
   const state = await read($, guard)
-  if (state.source !== 'repo' || state.repoRoot === null) {
-    return 'This repo already uses the global list.'
-  }
+  if (state.source !== 'repo' || state.repoRoot === null) return 'This repo already uses the global list.'
   await $.store.delete(repoKeyOf(state.repoRoot))
   await loadLists($, legacy)
   return `${state.repoName ?? 'This repo'} uses the global list again.`
 }
 
-/** Adds model ids the session saw running to the shared list (only the new ones cost a write). */
-async function noteSeen($: EngineInterface, models: readonly (string | null | undefined)[]): Promise<void> {
+/** The pane's repo button: a list of its own, or back to the global one. */
+async function toggleRepoList($: EngineInterface, legacy: LegacyOptions): Promise<void> {
   const state = await read($, guard)
-  const fresh = models.filter((m): m is string => typeof m === 'string' && !isInherited(m) && aliasOf(m) === null).filter(m => {
-    const base = splitSuffix(m).base
-    return !state.catalog.entries.some(e => e.ids.includes(base))
-  })
-  if (fresh.length === 0) {
+  $.ui.toast(state.source === 'repo' ? await useGlobalList($, legacy) : await useRepoList($))
+}
+
+/** Adds model ids the session saw running to the shared list (a write only when one is new). */
+async function noteSeen($: EngineInterface, models: readonly (string | null | undefined)[]): Promise<void> {
+  const catalog = await addSeen(storeOf($), (await read($, guard)).catalog, models, await $.clock.now())
+  if (catalog !== null) {
+    await update($, guard, s => ({ ...s, catalog }))
+  }
+}
+
+/** Notes the main conversation's model, and says so when it runs on a blocked version. */
+async function checkMainModel($: EngineInterface, model: string | null | undefined): Promise<void> {
+  if (typeof model !== 'string' || (parseModelId(model) === null && aliasOf(model) === null)) {
     return
   }
+  await noteSeen($, [model])
+  const state = await read($, guard)
+  if (!isAllowedModel(state.policy, state.catalog, model)) {
+    $.ui.toast(`model-guard: this conversation runs on ${labelOf(nameOf(model))}, which is blocked here. Subagents won't use it; /model switches.`)
+  }
+}
+
+/**
+ * Loads the model list from Anthropic through the session's own login and
+ * merges it into the shared list; a model new to the list gets a toast.
+ */
+async function refreshList($: EngineInterface, force: boolean): Promise<string> {
   const now = await $.clock.now()
-  const incoming: Incoming[] = fresh.map(id => ({ id, source: 'seen' }))
-  const { catalog } = mergeCatalog(parseCatalog(await $.store.get(CATALOG)), incoming, now)
-  await $.store.set(CATALOG, catalog)
+  const before = await read($, guard)
+  if (!force && !isStale(before.catalog, now)) {
+    return `The model list is up to date (${before.catalog.entries.length} models).`
+  }
+  let result: Result<Incoming[]>
+  try {
+    const auth = await $.session.authorize()
+    result = auth === null ? { ok: false, error: NO_LOGIN } : await fetchModels(url => $.http.fetch(url, { auth: auth.handle, headers: { 'anthropic-version': API_VERSION } }))
+  } catch (error) {
+    result = { ok: false, error: `the Models API could not be reached (${messageOf(error)})` }
+  }
+  const { catalog, added } = await saveFetched(storeOf($), result, now)
   await update($, guard, s => ({ ...s, catalog }))
+  const { policy } = await read($, guard)
+  for (const entry of added) {
+    $.ui.toast(newModelText(policy, entry))
+  }
+  return result.ok ? `Model list updated: ${catalog.entries.length} models${added.length > 0 ? `, ${added.length} new` : ''}.` : `Model list not updated: ${result.error}.`
 }
 
 async function showStatus($: EngineInterface): Promise<void> {
   const state = await read($, guard)
   $.ui.status(state.recent.length > 0 ? `model-guard: ${summaryOf(state)}` : undefined)
-}
-
-/** The refusal Claude reads: what is blocked and what to ask for instead. */
-function refusalOf(state: GuardState, asked: string, target: string | null): string {
-  const blocked = blockedOf(state.policy)
-  const instead = target === null ? 'No allowed model is known yet; ask the user to open /models.' : `Spawn the agent again with model "${target}".`
-  return `model-guard: ${labelOf(nameOf(asked))} is blocked in this session (blocked: ${blocked.join(', ') || 'nothing else'}). ${instead}`
 }
 
 const legacyOf = (raw: Readonly<Record<string, unknown>>): LegacyOptions => ({ defaultAllowed: raw.defaultAllowed, fallback: raw.fallback, mode: raw.mode })
@@ -210,6 +203,11 @@ export const register: Register = (on, rawOptions) => {
       argumentHint: '[allow|block <model> | new <family> allow|block | refresh | repo | global]',
     })
     await ensureReady($, legacy)
+    await checkMainModel($, await $.session.model())
+    // After the session is up, not in its way: the list is a day fresh at most.
+    $.clock.after(0, () => {
+      void refreshList($, false).catch(error => $.ui.status(`model-guard: model list not refreshed (${messageOf(error)})`))
+    })
     return next(e)
   })
 
@@ -230,15 +228,20 @@ export const register: Register = (on, rawOptions) => {
     return next(e)
   })
 
+  on('classic.PostModelSwitch', async ($, e, next) => {
+    const result = await next(e)
+    await checkMainModel($, e.to_model)
+    return result
+  })
+
   on('command.run', { command: 'models' }, async ($, e) => {
     await ensureReady($, legacy)
     const arg = (e.args ?? '').trim().toLowerCase()
     // B4 replaces this with the full command set.
     if (arg === 'save' || arg === 'repo') return { text: await useRepoList($) }
     if (arg === 'reset' || arg === 'global') return { text: await useGlobalList($, legacy) }
-    if (arg !== '') {
-      return { text: await setFamilyList($, arg.split(/[\s,;]+/).filter(Boolean)) }
-    }
+    if (arg === 'refresh') return { text: await refreshList($, true) }
+    if (arg !== '') return { text: await setFamilyList($, arg.split(/[\s,;]+/).filter(Boolean)) }
     try {
       // Where nothing draws (cloud, -p) the text answer below is the view.
       await $.ui.open({ id: PANE, title: 'Models', rows: 18 })
@@ -263,14 +266,14 @@ export const register: Register = (on, rawOptions) => {
         const to = target?.ids[0] ?? null
         const at = await $.clock.now()
         const from = nameOf(asked)
-        if (state.policy.mode === 'deny' || to === null) {
+        if (state.policy.mode === 'deny' || target === null || to === null) {
           await update($, guard, s => withEvent(s, { at, kind: 'deny', what: e.description, from }))
           $.ui.toast(`model-guard: refused a ${labelOf(from)} subagent (${e.description})`)
           await showStatus($)
-          return { deny: refusalOf(state, asked, to) }
+          return { deny: refusalOf(state.policy, asked, to) }
         }
-        await update($, guard, s => withEvent(s, { at, kind: 'swap', what: e.description, from, to: target?.key }))
-        $.ui.toast(`model-guard: ${e.description}: ${labelOf(from)} → ${labelOf(target?.key ?? to)}`)
+        await update($, guard, s => withEvent(s, { at, kind: 'swap', what: e.description, from, to: target.key }))
+        $.ui.toast(`model-guard: ${e.description}: ${labelOf(from)} → ${labelOf(target.key)}`)
         spawn = { ...e, model: to + splitSuffix(asked).suffix }
       } else if (concrete !== asked) {
         // An alias whose family has a blocked version: the newest allowed one, not the host's newest.
@@ -294,7 +297,8 @@ export const register: Register = (on, rawOptions) => {
       return yield* next(e)
     }
     const target = swapTarget(state.policy, state.catalog, familyOfId(e.model))
-    if (target === null || target.ids[0] === undefined) {
+    const to = target?.ids[0]
+    if (target === null || to === undefined) {
       return yield* next(e)
     }
     const loop = e.agentId
@@ -305,7 +309,7 @@ export const register: Register = (on, rawOptions) => {
       $.ui.toast(`model-guard: a subagent's ${labelOf(from)} requests now go to ${labelOf(target.key)}`)
       await showStatus($)
     }
-    return yield* next({ ...e, model: target.ids[0] + splitSuffix(e.model).suffix })
+    return yield* next({ ...e, model: to + splitSuffix(e.model).suffix })
   })
 
   on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {
@@ -314,8 +318,8 @@ export const register: Register = (on, rawOptions) => {
     let script = input.script ?? ''
     if (script === '' && typeof input.scriptPath === 'string') {
       try {
-        const read = await $.fs.read(input.scriptPath)
-        script = typeof read === 'string' ? read : ''
+        const text = await $.fs.read(input.scriptPath)
+        script = typeof text === 'string' ? text : ''
       } catch {
         script = ''
       }
@@ -345,11 +349,7 @@ export const register: Register = (on, rawOptions) => {
     const from = keyOf(e.to_model)
     await update($, guard, s => withEvent(s, { at, kind: 'deny', what: '/model', from }))
     await showStatus($)
-    return {
-      ...result,
-      permissionDecision: 'deny' as const,
-      permissionDecisionReason: `${labelOf(from)} is blocked. Allow it in /models first.`,
-    }
+    return { ...result, permissionDecision: 'deny' as const, permissionDecisionReason: `${labelOf(from)} is blocked. Allow it in /models first.` }
   })
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {

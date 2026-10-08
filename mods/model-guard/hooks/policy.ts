@@ -4,7 +4,7 @@
  */
 import { compareEntries, EMPTY_CATALOG, entriesOf, familiesOf } from './catalog'
 import type { Catalog, CatalogEntry } from './catalog'
-import { aliasOf, familyOfId, isInherited, keyOf, KNOWN_FAMILIES } from './ids'
+import { aliasOf, familyOfId, familyOfKey, isInherited, keyOf, KNOWN_FAMILIES } from './ids'
 
 export type Decision = 'allow' | 'block'
 export type Mode = 'deny' | 'swap'
@@ -21,7 +21,9 @@ export type Policy = {
   mode: Mode
 }
 
-export const DEFAULT_POLICY: Policy = { families: {}, unnamedFamilies: 'allow', versions: {}, fallback: 'opus', mode: 'deny' }
+const defaultPolicy = (): Policy => ({ families: {}, unnamedFamilies: 'allow', versions: {}, fallback: 'opus', mode: 'deny' })
+
+export const DEFAULT_POLICY: Policy = defaultPolicy()
 
 /** Where a swap goes when neither the family nor the fallback has an allowed version: the one family order left in code. */
 const PREFERENCE = ['opus', 'fable', 'sonnet', 'haiku'] as const
@@ -82,10 +84,16 @@ export function concreteFor(policy: Policy, catalog: Catalog, asked: string): st
   if (alias === null) return isAllowedModel(policy, catalog, asked) ? asked : null
   const entries = entriesOf(catalog, alias.family)
   if (entries.length === 0) return familyDefault(policy, alias.family) === 'allow' ? asked : null
-  const allowed = entries.filter(allows(policy))
-  if (allowed.length === entries.length) return asked
-  const id = allowed[0]?.ids[0]
+  if (!mayPickBlocked(policy, catalog, alias.family, entries)) return asked
+  const id = entries.find(allows(policy))?.ids[0]
   return id === undefined ? null : `${id}${alias.suffix}`
+}
+
+/** Could the host's own newest for this family be blocked? A blocked entry, a blocking family default, or a block rule on any of its versions (listed or not). */
+function mayPickBlocked(policy: Policy, catalog: Catalog, family: string, entries: readonly CatalogEntry[]): boolean {
+  if (familyDefault(policy, family) === 'block' || !entries.every(allows(policy))) return true
+  const familyOfRule = (key: string) => catalog.entries.find(e => e.key === key)?.family ?? familyOfKey(key)
+  return Object.entries(policy.versions).some(([key, decision]) => decision === 'block' && familyOfRule(key) === family)
 }
 
 /** Newest allowed by PREFERENCE (opus, fable, sonnet, haiku). */
@@ -97,13 +105,13 @@ function preferred(policy: Policy, catalog: Catalog): CatalogEntry | null {
   return null
 }
 
-/** policy.fallback as an entry: the version it names, else its family's newest allowed; null when blocked or absent. */
+/** policy.fallback as an entry: the version it names if listed, else the newest allowed of its family ('sonnet-4.9' or 'sonnet'); null when blocked or absent. */
 function namedFallback(policy: Policy, catalog: Catalog): CatalogEntry | null {
   const fallback = policy.fallback?.trim() ?? ''
   if (fallback === '') return null
   const key = keyOf(fallback)
   const exact = catalog.entries.find(e => e.key === key)
-  if (exact === undefined) return allowedEntries(policy, catalog, key)[0] ?? null
+  if (exact === undefined) return allowedEntries(policy, catalog, familyOfKey(key) ?? key)[0] ?? null
   return allows(policy)(exact) ? exact : null
 }
 
@@ -117,51 +125,60 @@ export function swapTarget(policy: Policy, catalog: Catalog, family: string): Ca
   return allowedEntries(policy, catalog, family)[0] ?? fallbackEntry(policy, catalog) ?? allowedEntries(policy, catalog)[0] ?? null
 }
 
-/** `next`, unless it is a block that would leave no entry of a non-empty list allowed (something must run). */
-function guarded(policy: Policy, catalog: Catalog, decision: Decision, next: Policy): Policy {
-  const isLastBlocked = decision === 'block' && catalog.entries.length > 0 && allowedEntries(next, catalog).length === 0
-  return isLastBlocked ? policy : next
+/** `next`, unless it blocks something and leaves no entry of a non-empty list allowed (something must run). Allowing is never refused. */
+function guarded(policy: Policy, catalog: Catalog, blocks: boolean, next: Policy): Policy {
+  return blocks && catalog.entries.length > 0 && allowedEntries(next, catalog).length === 0 ? policy : next
 }
 
 /** Version rule set; refuses (returns the same object) when it would leave no catalog entry allowed. */
 export function withVersion(policy: Policy, catalog: Catalog, key: string, decision: Decision): Policy {
-  return guarded(policy, catalog, decision, { ...policy, versions: { ...policy.versions, [keyOf(key)]: decision } })
+  return guarded(policy, catalog, decision === 'block', { ...policy, versions: { ...policy.versions, [keyOf(key)]: decision } })
 }
 
 /** Family default set; same refusal rule as withVersion. */
 export function withFamily(policy: Policy, catalog: Catalog, family: string, decision: Decision): Policy {
-  return guarded(policy, catalog, decision, { ...policy, families: { ...policy.families, [family.trim().toLowerCase()]: decision } })
+  return guarded(policy, catalog, decision === 'block', { ...policy, families: { ...policy.families, [family.trim().toLowerCase()]: decision } })
 }
 
-/** `/models opus,sonnet`: listed families allow, every other known family (KNOWN_FAMILIES + catalog families) block, unnamedFamilies = listed includes 'other' ? allow : block. Version rules kept. */
+/** The default for families not in `families`; same refusal rule as withVersion. */
+export function withUnnamed(policy: Policy, catalog: Catalog, decision: Decision): Policy {
+  return guarded(policy, catalog, decision === 'block', { ...policy, unnamedFamilies: decision })
+}
+
+/** `/models opus,sonnet`: listed families allow, every other known family (KNOWN_FAMILIES + catalog families) block, unnamedFamilies = listed includes 'other' ? allow : block. Version rules kept. Same refusal rule as withVersion. */
 export function withFamilyList(policy: Policy, catalog: Catalog, listed: readonly string[]): Policy {
   const on = new Set(listed.map(f => f.trim().toLowerCase()).filter(f => f !== ''))
   const known = new Set([...KNOWN_FAMILIES, ...familiesOf(catalog), ...Object.keys(policy.families), ...on])
   known.delete('other')
   const families = Object.fromEntries([...known].map((f): [string, Decision] => [f, on.has(f) ? 'allow' : 'block']))
-  return { ...policy, families, unnamedFamilies: on.has('other') ? 'allow' : 'block' }
+  return guarded(policy, catalog, true, { ...policy, families, unnamedFamilies: on.has('other') ? 'allow' : 'block' })
 }
 
-/** A record of decisions, or null when anything in it is not one. */
-function decisionsOf(raw: unknown): Record<string, Decision> | null {
-  if (!isRecord(raw)) return null
-  const pairs: [string, Decision][] = []
+/** The allow/block rules of a stored record, keys normalised by `norm`; anything else dropped. */
+function rulesOf(raw: Record<string, unknown>, norm: (key: string) => string): Record<string, Decision> {
+  const rules: [string, Decision][] = []
   for (const [key, value] of Object.entries(raw)) {
-    if (!isDecision(value)) return null
-    pairs.push([key, value])
+    const name = norm(key)
+    if (isDecision(value) && name !== '') rules.push([name, value])
   }
-  return Object.fromEntries(pairs)
+  return Object.fromEntries(rules)
 }
 
-/** Narrow a stored 0.3 record; anything else → null. */
+/**
+ * A stored 0.3 record (it has `families` and `versions` objects), read leniently so one bad field never
+ * loses the rules: a bad `unnamedFamilies`/`mode`/`fallback` takes its default, a bad rule is dropped. Anything else → null.
+ */
 export function parsePolicy(raw: unknown): Policy | null {
-  if (!isRecord(raw)) return null
-  const families = decisionsOf(raw.families)
-  const versions = decisionsOf(raw.versions)
+  if (!isRecord(raw) || !isRecord(raw.families) || !isRecord(raw.versions)) return null
   const { unnamedFamilies, fallback, mode } = raw
-  if (families === null || versions === null || !isDecision(unnamedFamilies) || !isMode(mode)) return null
-  if (fallback !== undefined && fallback !== null && typeof fallback !== 'string') return null
-  return { families, unnamedFamilies, versions, fallback: fallback === undefined || fallback === '' ? null : fallback, mode }
+  const defaults = defaultPolicy()
+  return {
+    families: rulesOf(raw.families, f => f.trim().toLowerCase()),
+    unnamedFamilies: isDecision(unnamedFamilies) ? unnamedFamilies : defaults.unnamedFamilies,
+    versions: rulesOf(raw.versions, keyOf),
+    fallback: typeof fallback === 'string' || fallback === null ? fallback : defaults.fallback,
+    mode: isMode(mode) ? mode : defaults.mode,
+  }
 }
 
 export type LegacyOptions = { defaultAllowed?: unknown; fallback?: unknown; mode?: unknown }
@@ -176,10 +193,10 @@ function legacyList(raw: unknown): string[] | null {
   return list.length > 0 ? list : null
 }
 
-/** A 0.2 fallback: a known family word, else undefined. */
+/** A 0.2 fallback: one of its family words ('other' included, resolved as a family), else undefined. */
 function legacyFallback(raw: unknown): string | undefined {
   const word = typeof raw === 'string' ? raw.trim().toLowerCase() : ''
-  return (KNOWN_FAMILIES as readonly string[]).includes(word) ? word : undefined
+  return LEGACY_FAMILIES.includes(word) ? word : undefined
 }
 
 /**
@@ -194,7 +211,7 @@ export function migratePolicy(stored: unknown, legacy: LegacyOptions): Policy {
   if (current !== null) return current
   const record: Record<string, unknown> = Array.isArray(stored) ? { allowed: stored } : isRecord(stored) ? stored : {}
   const list = legacyList(record.allowed) ?? legacyList(legacy.defaultAllowed)
-  const base = list === null ? DEFAULT_POLICY : withFamilyList(DEFAULT_POLICY, EMPTY_CATALOG, list)
+  const base = list === null ? defaultPolicy() : withFamilyList(defaultPolicy(), EMPTY_CATALOG, list)
   const mode = isMode(record.mode) ? record.mode : isMode(legacy.mode) ? legacy.mode : base.mode
   return { ...base, fallback: legacyFallback(record.fallback) ?? legacyFallback(legacy.fallback) ?? base.fallback, mode }
 }

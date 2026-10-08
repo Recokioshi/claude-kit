@@ -2,7 +2,7 @@
  * The model list: one entry per version, merged from the Models API, models
  * seen in the session, and ids the user added. Pure: no `$`.
  */
-import { aliasOf, compareVersions, familyRank, isInherited, keyOf, parseModelId, splitSuffix } from './ids'
+import { aliasOf, compareVersions, familyOfId, familyRank, isInherited, keyOf, parseModelId, splitSuffix } from './ids'
 
 export type CatalogSource = 'api' | 'seen' | 'added' | 'seed'
 const SOURCES: readonly CatalogSource[] = ['api', 'seen', 'added', 'seed']
@@ -21,7 +21,9 @@ export type CatalogEntry = {
 
 export type Catalog = { entries: CatalogEntry[]; fetchedAt: number | null; lastError: string | null }
 
-export const EMPTY_CATALOG: Catalog = { entries: [], fetchedAt: null, lastError: null }
+const emptyCatalog = (): Catalog => ({ entries: [], fetchedAt: null, lastError: null })
+
+export const EMPTY_CATALOG: Catalog = emptyCatalog()
 
 export type Result<T> = { ok: true; value: T } | { ok: false; error: string }
 
@@ -67,17 +69,26 @@ export function parseModelsResponse(text: string): Result<ModelsPage> {
 }
 
 const sameId = (a: string) => (b: string) => a.toLowerCase() === b.toLowerCase()
+const familyName = (v: unknown): string | undefined => (isFilled(v) ? v.trim().toLowerCase() : undefined)
+
+/**
+ * Key, family and version read from an id. An id that does not parse is its own key, version '';
+ * its family is a known family word inside it, else `named` (the API's line, or the stored family), else 'other'.
+ */
+function identityOf(id: string, named: string | undefined): Pick<CatalogEntry, 'key' | 'family' | 'version'> {
+  const parsed = parseModelId(id)
+  if (parsed !== null) return { key: parsed.key, family: parsed.family, version: parsed.version }
+  const guessed = familyOfId(id)
+  return { key: keyOf(id), family: guessed !== 'other' ? guessed : (named ?? 'other'), version: '' }
+}
 
 /** One sighting folded into its entry (or a new one). */
 function sighted(current: CatalogEntry | undefined, item: Incoming, base: string, now: number): CatalogEntry {
-  const parsed = parseModelId(base)
-  const line = isFilled(item.line) ? item.line.trim().toLowerCase() : undefined
+  const line = familyName(item.line)
   const isApi = item.source === 'api'
   if (current === undefined) {
     return {
-      key: parsed?.key ?? base.toLowerCase(),
-      family: parsed?.family ?? line ?? 'other',
-      version: parsed?.version ?? '',
+      ...identityOf(base, line),
       ids: [base],
       ...meta(item.displayName, item.createdAt),
       sources: [item.source],
@@ -90,16 +101,19 @@ function sighted(current: CatalogEntry | undefined, item: Incoming, base: string
   const createdAt = isApi ? (item.createdAt ?? current.createdAt) : (current.createdAt ?? item.createdAt)
   return {
     ...current,
-    family: parsed === null && line !== undefined ? line : current.family,
+    family: identityOf(base, line ?? current.family).family,
     ids,
     ...meta(displayName, createdAt),
     sources: current.sources.includes(item.source) ? current.sources : [...current.sources, item.source],
   }
 }
 
-/** Not a version: nothing, `inherit`, or a family alias ('opus', 'opus[1m]'). */
+/** Claude Code's own model aliases that name no one version. */
+const HOST_ALIASES: readonly string[] = ['default', 'opusplan']
+
+/** Not a version: nothing, `inherit`, a family alias ('opus', 'opus[1m]') or a host alias ('opusplan'). */
 function isVersionless(base: string, families: readonly string[]): boolean {
-  return base === '' || isInherited(base) || aliasOf(base, families) !== null
+  return base === '' || isInherited(base) || aliasOf(base, families) !== null || HOST_ALIASES.includes(base.toLowerCase())
 }
 
 /**
@@ -137,26 +151,45 @@ export function removeAdded(catalog: Catalog, id: string): Catalog {
   return { ...catalog, entries }
 }
 
+/** A stored entry; key, family and version are read again from ids[0], so older keys are brought up to date. */
 function entryOf(raw: unknown): CatalogEntry | null {
   if (!isRecord(raw)) return null
-  const { key, family, version, ids, sources, firstSeenAt } = raw
-  if (!isFilled(key) || !isFilled(family) || typeof version !== 'string') return null
-  if (!Array.isArray(ids) || ids.length === 0 || !ids.every(isFilled)) return null
+  const { family, ids, sources, firstSeenAt } = raw
+  if (!Array.isArray(ids) || !ids.every(isFilled)) return null
   if (!Array.isArray(sources) || sources.length === 0 || !sources.every(isSource)) return null
   if (typeof firstSeenAt !== 'number' || !Number.isFinite(firstSeenAt)) return null
-  return { key, family, version, ids: [...ids], ...meta(raw.displayName, raw.createdAt), sources: [...sources], firstSeenAt }
+  const [first] = ids
+  if (first === undefined) return null
+  return { ...identityOf(first, familyName(family)), ids: [...ids], ...meta(raw.displayName, raw.createdAt), sources: [...sources], firstSeenAt }
 }
 
-/** Narrows a stored value; garbage → EMPTY_CATALOG; malformed entries dropped. */
+/** Two stored entries of one version as one: the API's spelling first, every id and source once, the earliest sighting. */
+function joined(a: CatalogEntry, b: CatalogEntry): CatalogEntry {
+  const [first, second] = b.sources.includes('api') && !a.sources.includes('api') ? [b, a] : [a, b]
+  return {
+    ...first,
+    ids: [...first.ids, ...second.ids.filter(id => !first.ids.some(sameId(id)))],
+    ...meta(first.displayName ?? second.displayName, first.createdAt ?? second.createdAt),
+    sources: [...a.sources, ...b.sources.filter(s => !a.sources.includes(s))],
+    firstSeenAt: Math.min(a.firstSeenAt, b.firstSeenAt),
+  }
+}
+
+/** Narrows a stored value; garbage → an empty list; malformed entries dropped, entries of one version joined. */
 export function parseCatalog(raw: unknown): Catalog {
-  if (!isRecord(raw) || !Array.isArray(raw.entries)) return EMPTY_CATALOG
+  if (!isRecord(raw) || !Array.isArray(raw.entries)) return emptyCatalog()
   const entries: CatalogEntry[] = []
-  const keys = new Set<string>()
+  const at = new Map<string, number>()
   for (const item of raw.entries) {
     const entry = entryOf(item)
-    if (entry !== null && !keys.has(entry.key)) {
-      keys.add(entry.key)
+    if (entry === null) continue
+    const i = at.get(entry.key)
+    const kept = i === undefined ? undefined : entries[i]
+    if (i === undefined || kept === undefined) {
+      at.set(entry.key, entries.length)
       entries.push(entry)
+    } else {
+      entries[i] = joined(kept, entry)
     }
   }
   const fetchedAt = typeof raw.fetchedAt === 'number' && Number.isFinite(raw.fetchedAt) ? raw.fetchedAt : null

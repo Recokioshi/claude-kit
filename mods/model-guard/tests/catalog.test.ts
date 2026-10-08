@@ -164,12 +164,19 @@ describe('mergeCatalog', () => {
     expect(after.entries[0]?.family).toBe('nova')
     expect(mergeCatalog(EMPTY_CATALOG, [{ id: 'claude-opus-5', source: 'api', line: 'sonnet' }], 1).catalog.entries[0]?.family).toBe('opus')
   })
-  test('nothing, inherit and family aliases are not versions', () => {
+  test('a trailing .0 spelling is the same version', () => {
+    const { catalog, added } = mergeCatalog(EMPTY_CATALOG, [{ id: 'claude-opus-5', source: 'api' }, { id: 'claude-opus-5-0', source: 'seen' }], 1000)
+    expect(keys(added)).toEqual(['opus-5'])
+    expect(catalog.entries[0]?.ids).toEqual(['claude-opus-5', 'claude-opus-5-0'])
+  })
+  test('nothing, inherit, family aliases and host aliases are not versions', () => {
     const { catalog, added } = mergeCatalog(filled(), [
       { id: '', source: 'seen' },
       { id: 'inherit', source: 'seen' },
       { id: 'opus[1m]', source: 'seen' },
       { id: 'Sonnet', source: 'seen' },
+      { id: 'default', source: 'seen' },
+      { id: 'opusplan', source: 'seen' },
     ], 2000)
     expect(added).toEqual([])
     expect(catalog.entries).toHaveLength(API_IDS.length)
@@ -208,23 +215,26 @@ describe('parseCatalog', () => {
     const catalog = { ...mergeCatalog(filled(), [{ id: 'gpt-6.1-sol', source: 'added' }], 2000).catalog, fetchedAt: 1234, lastError: 'HTTP 500' }
     expect(parseCatalog(JSON.parse(JSON.stringify(catalog)))).toEqual(catalog)
   })
-  test('garbage is an empty list', () => {
+  test('garbage is an empty list, a fresh one each time', () => {
     for (const raw of [undefined, null, 'x', 42, [], { entries: 'x' }]) {
-      expect(parseCatalog(raw)).toEqual(EMPTY_CATALOG)
+      const catalog = parseCatalog(raw)
+      expect(catalog).toEqual(EMPTY_CATALOG)
+      expect(catalog).not.toBe(EMPTY_CATALOG)
+      catalog.entries.push(...filled().entries)
     }
+    expect(EMPTY_CATALOG.entries).toEqual([])
   })
-  test('malformed entries are dropped, good ones and duplicates-free keys kept', () => {
+  test('malformed entries are dropped', () => {
     const good = { key: 'opus-5', family: 'opus', version: '5', ids: ['claude-opus-5'], sources: ['api'], firstSeenAt: 1, displayName: 7 }
     const raw = {
       entries: [
         good,
-        { ...good, key: 'opus-5', ids: ['other-spelling'] },
-        { ...good, key: '' },
-        { ...good, key: 'a', ids: [] },
-        { ...good, key: 'b', ids: [3] },
-        { ...good, key: 'c', sources: ['api', 'stolen'] },
-        { ...good, key: 'd', firstSeenAt: 'yesterday' },
-        { ...good, key: 'e', version: 5 },
+        { ...good, ids: [] },
+        { ...good, ids: [3] },
+        { ...good, ids: 'claude-opus-5' },
+        { ...good, sources: ['api', 'stolen'] },
+        { ...good, sources: [] },
+        { ...good, firstSeenAt: 'yesterday' },
         'claude-opus-4-8',
       ],
       fetchedAt: 'soon',
@@ -235,6 +245,32 @@ describe('parseCatalog', () => {
       fetchedAt: null,
       lastError: null,
     })
+  })
+})
+
+describe('parseCatalog brings stored keys up to date', () => {
+  const stored = (over: Record<string, unknown>) => ({ key: 'x', family: 'x', version: 'x', ids: ['claude-opus-5'], sources: ['seen'], firstSeenAt: 1, ...over })
+  test('key, family and version are read again from ids[0]', () => {
+    const catalog = parseCatalog({ entries: [stored({ key: 'opus-5.0', family: 'opus', version: '5.0', ids: ['claude-opus-5-0'] })] })
+    expect(catalog.entries).toEqual([{ key: 'opus-5', family: 'opus', version: '5', ids: ['claude-opus-5-0'], sources: ['seen'], firstSeenAt: 1 }])
+  })
+  test('entries that turn out to be one version are joined: API spelling first, earliest sighting', () => {
+    const catalog = parseCatalog({
+      entries: [
+        stored({ key: 'opus-5.0', ids: ['claude-opus-5-0'], sources: ['seen', 'added'], firstSeenAt: 5 }),
+        stored({ key: 'opus-5', ids: ['claude-opus-5', 'CLAUDE-OPUS-5-0'], sources: ['api'], firstSeenAt: 9, displayName: 'Claude Opus 5' }),
+      ],
+    })
+    expect(catalog.entries).toEqual([
+      { key: 'opus-5', family: 'opus', version: '5', ids: ['claude-opus-5', 'CLAUDE-OPUS-5-0'], displayName: 'Claude Opus 5', sources: ['seen', 'added', 'api'], firstSeenAt: 5 },
+    ])
+  })
+  test('the stored family is kept only for an id that does not parse and names no known family', () => {
+    const familyOf = (over: Record<string, unknown>) => parseCatalog({ entries: [stored(over)] }).entries[0]?.family
+    expect(familyOf({ family: 'Nova', ids: ['claude-nova-orbit'] })).toBe('nova')
+    expect(familyOf({ family: 'nova', ids: ['claude-opus-5'] })).toBe('opus')
+    expect(familyOf({ family: 'nova', ids: ['opus-preview-x'] })).toBe('opus')
+    expect(familyOf({ family: 7, ids: ['gpt-6.1-sol'] })).toBe('other')
   })
 })
 

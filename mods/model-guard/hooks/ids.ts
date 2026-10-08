@@ -8,27 +8,34 @@ export const KNOWN_FAMILIES = ['opus', 'sonnet', 'haiku', 'fable'] as const
 
 export type ParsedModel = { family: string; version: string; key: string }
 
-/** Everything up to and including `anthropic.`: 'us.anthropic.', 'global.anthropic.', a Bedrock ARN's profile path. */
-const PROVIDER_PREFIX = /^.*anthropic\./
-const BEDROCK_SUFFIX = /-v\d+(?::\d+)?$/
+/** Everything up to and including `anthropic.` or `anthropic/`: 'us.anthropic.', a Bedrock ARN's profile path, a gateway's 'anthropic/'. */
+const PROVIDER_PREFIX = /^.*anthropic[./]/
 const VERTEX_SUFFIX = /@.*$/
+const BEDROCK_SUFFIX = /-v\d+(?::\d+)?$/
 const LATEST_SUFFIX = /-latest$/
 const DATE_SUFFIX = /-\d{8}$/
-const NEW_ORDER = /^claude-([a-z]+)-(\d+(?:-\d+)*)$/
-const OLD_ORDER = /^claude-(\d+(?:-\d+)*)-([a-z]+)$/
+const NEW_ORDER = /^claude-([a-z]+)-(\d+(?:[-.]\d+)*)$/
+const OLD_ORDER = /^claude-(\d+(?:[-.]\d+)*)-([a-z]+)$/
+/** A rule key's shape: 'opus-4.8'. */
+const VERSION_KEY = /^([a-z]+)-(\d+(?:\.\d+)*)$/
 
+/** '4-8' or '4.8' → '4.8'; parts numeric, trailing zero parts dropped ('5-0' → '5'), at least one kept. */
 const parsed = (family: string, digits: string): ParsedModel => {
-  const version = digits.split('-').join('.')
+  const parts = digits.split(/[-.]/).map(p => String(Number(p)))
+  while (parts.length > 1 && parts.at(-1) === '0') {
+    parts.pop()
+  }
+  const version = parts.join('.')
   return { family, version, key: `${family}-${version}` }
 }
 
-/** 'claude-opus-4-8-20260301', 'us.anthropic.claude-opus-4-8-v1:0', 'claude-3-5-sonnet' → family + version; anything else → null. */
+/** 'claude-opus-4-8-20260301', 'us.anthropic.claude-opus-4-8-v1:0', 'claude-3-5-sonnet-v2@20241022', 'claude-opus-4.8' → family + version; anything else → null. */
 export function parseModelId(id: string): ParsedModel | null {
   const bare = splitSuffix(id)
     .base.toLowerCase()
     .replace(PROVIDER_PREFIX, '')
-    .replace(BEDROCK_SUFFIX, '')
     .replace(VERTEX_SUFFIX, '')
+    .replace(BEDROCK_SUFFIX, '')
     .replace(LATEST_SUFFIX, '')
     .replace(DATE_SUFFIX, '')
   const fresh = NEW_ORDER.exec(bare)
@@ -52,14 +59,26 @@ export function splitSuffix(model: string): { base: string; suffix: string } {
   return { base: text.slice(0, match.index).trim(), suffix: match[0] }
 }
 
-/** The rule key for any spelling: 'opus-4.8', or the lowercased id when it does not parse. */
+/** The rule key for any spelling: 'opus-4.8', or the lowercased id when it does not parse. A key is its own key ('opus-5.0' → 'opus-5'). */
 export function keyOf(id: string): string {
-  return parseModelId(id)?.key ?? splitSuffix(id).base.toLowerCase()
+  const parsedKey = parseModelId(id)?.key
+  if (parsedKey !== undefined) return parsedKey
+  const base = splitSuffix(id).base.toLowerCase()
+  const key = VERSION_KEY.exec(base)
+  return key?.[1] !== undefined && key[2] !== undefined ? parsed(key[1], key[2]).key : base
 }
 
-/** The family read from the id; 'other' when it does not parse. */
+/** The family read from the id; for one that does not parse, a known family word inside it ('opusplan' → opus); else 'other'. */
 export function familyOfId(id: string): string {
-  return parseModelId(id)?.family ?? 'other'
+  const parsedFamily = parseModelId(id)?.family
+  if (parsedFamily !== undefined) return parsedFamily
+  const text = splitSuffix(id).base.toLowerCase()
+  return KNOWN_FAMILIES.find(f => text.includes(f)) ?? 'other'
+}
+
+/** A rule key's family: 'opus-4.8' → 'opus'; null for a key not shaped family-version (an unparsable id). */
+export function familyOfKey(key: string): string | null {
+  return VERSION_KEY.exec(key)?.[1] ?? null
 }
 
 /** No model, or `inherit`: the request runs on the parent's model, which is the user's own choice. */

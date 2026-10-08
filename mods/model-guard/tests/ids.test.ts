@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { aliasOf, compareVersions, familyOfId, familyRank, isInherited, keyOf, parseModelId, splitSuffix } from '../hooks/ids'
+import { aliasOf, compareVersions, familyOfId, familyOfKey, familyRank, isInherited, keyOf, parseModelId, splitSuffix } from '../hooks/ids'
 
 /** Every spelling of a version, and the key it must share. */
 const KEYS: [string, string][] = [
@@ -15,6 +15,13 @@ const KEYS: [string, string][] = [
   ['claude-3-5-sonnet-20241022', 'sonnet-3.5'],
   ['claude-3-5-sonnet-latest', 'sonnet-3.5'],
   ['claude-nova-1', 'nova-1'],
+  ['claude-opus-5-0', 'opus-5'],
+  ['claude-opus-4-0', 'opus-4'],
+  ['claude-opus-4-0-20250514', 'opus-4'],
+  ['claude-3-5-sonnet-v2@20241022', 'sonnet-3.5'],
+  ['anthropic/claude-opus-4.5', 'opus-4.5'],
+  ['claude-opus-4.8', 'opus-4.8'],
+  ['arn:aws:bedrock:us-east-1:123456789012:inference-profile/us.anthropic.claude-opus-4-8-20260301-v1:0', 'opus-4.8'],
 ]
 
 const UNPARSABLE = ['gpt-6.1-sol', 'opus', 'inherit', '']
@@ -36,13 +43,15 @@ describe('parseModelId', () => {
     expect(parseModelId('anthropic.claude-fable-5-1-20260101-v1:0')?.key).toBe('fable-5.1')
     expect(parseModelId('  claude-opus-5-5[1m]  ')?.key).toBe('opus-5.5')
   })
-  test('anything else does not parse, and its family is other', () => {
-    for (const id of UNPARSABLE) {
+  test('anything else does not parse', () => {
+    for (const id of [...UNPARSABLE, 'claude-nova-orbit', 'claude-2', 'opusplan', 'default']) {
       expect({ id, parsed: parseModelId(id) }).toEqual({ id, parsed: null })
-      expect({ id, family: familyOfId(id) }).toEqual({ id, family: 'other' })
     }
-    expect(parseModelId('claude-nova-orbit')).toBeNull()
-    expect(parseModelId('claude-2')).toBeNull()
+  })
+  test('trailing zero parts are dropped, one part kept', () => {
+    expect(parseModelId('claude-opus-5-0-0')).toEqual({ family: 'opus', version: '5', key: 'opus-5' })
+    expect(parseModelId('claude-opus-0')?.key).toBe('opus-0')
+    expect(parseModelId('claude-opus-4-10')?.key).toBe('opus-4.10')
   })
 })
 
@@ -52,9 +61,29 @@ describe('keyOf and familyOfId', () => {
     expect(familyOfId('claude-haiku-4-5-20251001')).toBe('haiku')
     expect(familyOfId('claude-nova-1')).toBe('nova')
   })
+  test('an unparsable id takes a known family word inside it, else other', () => {
+    expect(familyOfId('opusplan')).toBe('opus')
+    expect(familyOfId('Opus[1m]')).toBe('opus')
+    expect(familyOfId('claude-sonnet-latest-preview')).toBe('sonnet')
+    for (const id of ['gpt-6.1-sol', 'default', 'inherit', '', 'claude-nova-orbit']) {
+      expect({ id, family: familyOfId(id) }).toEqual({ id, family: 'other' })
+    }
+  })
+  test('a rule key names its family; an unparsable-id key does not', () => {
+    expect(familyOfKey('opus-4.8')).toBe('opus')
+    expect(familyOfKey('nova-1')).toBe('nova')
+    expect(familyOfKey('gpt-6.1-sol')).toBeNull()
+    expect(familyOfKey('claude-nova-orbit')).toBeNull()
+    expect(familyOfKey('opus')).toBeNull()
+  })
   test('an unparsable id is its own key: suffix-free, lowercased, trimmed', () => {
     expect(keyOf(' GPT-6.1-Sol[1m] ')).toBe('gpt-6.1-sol')
     expect(keyOf('claude-nova-orbit')).toBe('claude-nova-orbit')
+  })
+  test('a key is its own key, trailing zero parts dropped', () => {
+    expect(keyOf('opus-4.8')).toBe('opus-4.8')
+    expect(keyOf('opus-5.0')).toBe('opus-5')
+    expect(keyOf('Nova-1')).toBe('nova-1')
   })
 })
 

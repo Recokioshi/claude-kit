@@ -15,6 +15,7 @@ import {
   swapTarget,
   withFamily,
   withFamilyList,
+  withUnnamed,
   withVersion,
 } from '../hooks/policy'
 import type { Policy } from '../hooks/policy'
@@ -83,7 +84,7 @@ describe('isRuled and allowedEntries', () => {
 describe('isAllowedModel', () => {
   const policy = policyOf({ versions: { 'opus-5': 'block' } })
   test('every spelling of a blocked version is blocked', () => {
-    for (const id of ['claude-opus-5', 'claude-opus-5-20260901', 'claude-opus-5[1m]', 'CLAUDE-OPUS-5', 'us.anthropic.claude-opus-5-20260901-v1:0', 'claude-opus-5@20260901']) {
+    for (const id of ['claude-opus-5', 'claude-opus-5-0', 'claude-opus-5-20260901', 'claude-opus-5[1m]', 'CLAUDE-OPUS-5', 'us.anthropic.claude-opus-5-20260901-v1:0', 'claude-opus-5@20260901']) {
       expect({ id, allowed: isAllowedModel(policy, OPUS, id) }).toEqual({ id, allowed: false })
     }
     expect(isAllowedModel(policy, OPUS, 'us.anthropic.claude-opus-4-8-20260301-v1:0')).toBe(true)
@@ -122,6 +123,12 @@ describe('concreteFor', () => {
   test('an alias is left alone when nothing in its family is blocked', () => {
     expect(concreteFor(DEFAULT_POLICY, OPUS, 'opus')).toBe('opus')
     expect(concreteFor(blocked5, OPUS, 'sonnet[1m]')).toBe('sonnet[1m]')
+    expect(concreteFor(policyOf({ versions: { 'sonnet-6': 'block' } }), OPUS, 'opus')).toBe('opus')
+  })
+  test('an alias is pinned when the host\'s own newest could be blocked: a blocking family default, or a block rule on a version not listed', () => {
+    const only48 = catalogOf(['claude-opus-4-8'])
+    expect(concreteFor(policyOf({ families: { opus: 'block' }, versions: { 'opus-4.8': 'allow' } }), only48, 'opus')).toBe('claude-opus-4-8')
+    expect(concreteFor(policyOf({ versions: { 'opus-6': 'block' } }), OPUS, 'opus[1m]')).toBe('claude-opus-5[1m]')
   })
   test('an alias with nothing allowed, or an empty family whose default blocks, has no answer', () => {
     expect(concreteFor(policyOf({ families: { opus: 'block' } }), OPUS, 'opus')).toBeNull()
@@ -155,6 +162,15 @@ describe('swapTarget and fallbackEntry', () => {
     expect(swapTarget(policyOf({ families: { haiku: 'block' } }), catalog, 'haiku')?.key).toBe('nova-2')
     expect(swapTarget(policyOf({ families: { haiku: 'block' }, unnamedFamilies: 'block' }), catalog, 'haiku')).toBeNull()
   })
+  test('a fallback version not in the list goes to the newest allowed of its own family first', () => {
+    expect(fallbackEntry(policyOf({ fallback: 'sonnet-4.9' }), FULL)?.key).toBe('sonnet-5.5')
+    expect(fallbackEntry(policyOf({ fallback: 'sonnet-4.9', versions: { 'sonnet-5.5': 'block' } }), FULL)?.key).toBe('sonnet-5')
+    expect(fallbackEntry(policyOf({ fallback: 'sonnet-4.9', families: { sonnet: 'block' } }), FULL)?.key).toBe('opus-5.5')
+  })
+  test('an other fallback is a family fallback', () => {
+    const catalog = catalogOf(['claude-opus-5', 'gpt-6.1-sol'])
+    expect(fallbackEntry(policyOf({ fallback: 'other' }), catalog)?.key).toBe('gpt-6.1-sol')
+  })
   test('fallbackEntry resolves the fallback only when it is allowed', () => {
     expect(fallbackEntry(policyOf({ fallback: 'opus-4.8' }), FULL)?.key).toBe('opus-4.8')
     expect(fallbackEntry(policyOf({ fallback: 'claude-opus-4-8' }), FULL)?.key).toBe('opus-4.8')
@@ -177,10 +193,30 @@ describe('withVersion and withFamily', () => {
     const familyOff = policyOf({ families: { opus: 'block' }, versions: { 'opus-4.8': 'allow' } })
     expect(withVersion(familyOff, OPUS, 'opus-4.8', 'block')).toBe(familyOff)
   })
-  test('allowing, and an empty list, are never refused', () => {
+  test('allowing is never refused, blocking is, even when nothing is allowed already', () => {
     const none = policyOf({ families: { opus: 'block' } })
     expect(withVersion(none, OPUS, 'opus-5', 'allow')).not.toBe(none)
+    expect(withVersion(none, OPUS, 'opus-9', 'allow').versions).toEqual({ 'opus-9': 'allow' })
+    expect(withVersion(none, OPUS, 'opus-9', 'block')).toBe(none)
+    expect(withFamily(none, OPUS, 'sonnet', 'allow').families).toEqual({ opus: 'block', sonnet: 'allow' })
+    expect(withFamily(none, OPUS, 'sonnet', 'block')).toBe(none)
+    expect(withUnnamed(none, OPUS, 'allow')).not.toBe(none)
+    expect(withUnnamed(none, OPUS, 'block')).toBe(none)
+  })
+  test('with an empty list there is nothing to protect', () => {
     expect(withFamily(DEFAULT_POLICY, EMPTY_CATALOG, 'opus', 'block').families).toEqual({ opus: 'block' })
+    expect(withUnnamed(DEFAULT_POLICY, EMPTY_CATALOG, 'block').unnamedFamilies).toBe('block')
+    expect(withFamilyList(DEFAULT_POLICY, EMPTY_CATALOG, []).unnamedFamilies).toBe('block')
+  })
+  test('when only unnamedFamilies keeps something allowed, it cannot be turned off', () => {
+    const catalog = catalogOf(['claude-opus-5', 'claude-nova-1'])
+    const opusOff = withFamily(DEFAULT_POLICY, catalog, 'opus', 'block')
+    expect(opusOff.families).toEqual({ opus: 'block' })
+    expect(withUnnamed(opusOff, catalog, 'block')).toBe(opusOff)
+    expect(withFamily(opusOff, catalog, 'nova', 'block')).toBe(opusOff)
+    expect(withVersion(opusOff, catalog, 'nova-1', 'block')).toBe(opusOff)
+    expect(withUnnamed(DEFAULT_POLICY, catalog, 'block')).toBe(DEFAULT_POLICY)
+    expect(withUnnamed(policyOf({ families: { opus: 'allow' } }), catalog, 'block').unnamedFamilies).toBe('block')
   })
   test('inputs are not mutated', () => {
     const policy = policyOf({ versions: { 'opus-5': 'block' } })
@@ -193,12 +229,19 @@ describe('withVersion and withFamily', () => {
 
 describe('withFamilyList', () => {
   test('listed families allow, every other known family blocks, other decides unnamed families', () => {
-    const catalog = catalogOf(['claude-opus-5', 'claude-nova-1'])
+    const catalog = catalogOf(['claude-opus-5', 'claude-opus-4-8', 'claude-nova-1'])
     const policy = withFamilyList(policyOf({ versions: { 'opus-5': 'block' } }), catalog, ['Opus', 'sonnet'])
     expect(policy.families).toEqual({ opus: 'allow', sonnet: 'allow', haiku: 'block', fable: 'block', nova: 'block' })
     expect(policy.unnamedFamilies).toBe('block')
     expect(policy.versions).toEqual({ 'opus-5': 'block' })
     expect(withFamilyList(DEFAULT_POLICY, EMPTY_CATALOG, ['opus', 'other']).unnamedFamilies).toBe('allow')
+  })
+  test('a list that would leave nothing allowed is refused', () => {
+    const catalog = catalogOf(['claude-opus-5', 'claude-nova-1'])
+    const policy = policyOf({ versions: { 'opus-5': 'block' } })
+    expect(withFamilyList(policy, catalog, ['opus', 'haiku'])).toBe(policy)
+    expect(withFamilyList(policy, catalog, [])).toBe(policy)
+    expect(withFamilyList(policy, catalog, ['nova']).families).toMatchObject({ nova: 'allow', opus: 'block' })
   })
 })
 
@@ -208,21 +251,24 @@ describe('parsePolicy', () => {
     expect(parsePolicy(JSON.parse(JSON.stringify(policy)))).toEqual(policy)
     expect(parsePolicy({ ...policy, fallback: null })).toEqual({ ...policy, fallback: null })
   })
-  test('garbage is rejected', () => {
+  test('a 0.3 record with one bad field keeps every rule', () => {
+    const versions = { 'opus-5': 'block', 'opus-4.8': 'allow' }
+    expect(parsePolicy({ families: { opus: 'allow' }, versions, fallback: 'opus-4.8', mode: 'ask' })).toEqual({
+      families: { opus: 'allow' },
+      unnamedFamilies: 'allow',
+      versions,
+      fallback: 'opus-4.8',
+      mode: 'deny',
+    })
+    expect(parsePolicy({ families: {}, versions, unnamedFamilies: 'maybe', fallback: 5 })).toEqual({ ...DEFAULT_POLICY, versions })
+  })
+  test('bad rules are dropped; version keys and family names are normalised', () => {
+    const raw = { families: { Opus: 'allow', haiku: true, sonnet: 'deny' }, versions: { 'claude-opus-4-8': 'block', 'opus-5.0': 'allow', 'opus-4.7': 1 }, unnamedFamilies: 'block', fallback: null, mode: 'swap' }
+    expect(parsePolicy(raw)).toEqual({ families: { opus: 'allow' }, unnamedFamilies: 'block', versions: { 'opus-4.8': 'block', 'opus-5': 'allow' }, fallback: null, mode: 'swap' })
+  })
+  test('anything not shaped like a 0.3 record is not one', () => {
     const good = { families: {}, unnamedFamilies: 'allow', versions: {}, fallback: 'opus', mode: 'deny' }
-    const bad: unknown[] = [
-      null,
-      'opus',
-      ['opus'],
-      { allowed: ['opus'] },
-      { ...good, unnamedFamilies: 'maybe' },
-      { ...good, families: { opus: true } },
-      { ...good, families: ['opus'] },
-      { ...good, versions: { 'opus-5': 'deny' } },
-      { ...good, versions: null },
-      { ...good, fallback: 5 },
-      { ...good, mode: 'ask' },
-    ]
+    const bad: unknown[] = [null, 'opus', ['opus'], { allowed: ['opus'] }, { ...good, families: ['opus'] }, { ...good, versions: null }, { versions: {} }]
     for (const raw of bad) {
       expect({ raw, parsed: parsePolicy(raw) }).toEqual({ raw, parsed: null })
     }
@@ -260,6 +306,18 @@ describe('migratePolicy', () => {
       mode: 'swap',
     })
   })
+  test('a stored 0.2 record beats the options for families, fallback and mode', () => {
+    expect(migratePolicy({ allowed: ['haiku'], fallback: 'haiku', mode: 'deny' }, { defaultAllowed: 'opus,fable', fallback: 'fable', mode: 'swap' })).toEqual({
+      families: { opus: 'block', sonnet: 'block', haiku: 'allow', fable: 'block' },
+      unnamedFamilies: 'block',
+      versions: {},
+      fallback: 'haiku',
+      mode: 'deny',
+    })
+  })
+  test('a 0.2 fallback of other stays other', () => {
+    expect(migratePolicy({ allowed: ['opus', 'other'], fallback: 'other' }, { fallback: 'opus' }).fallback).toBe('other')
+  })
   test('all five families allow everything', () => {
     const policy = migratePolicy(null, { defaultAllowed: 'opus,sonnet,haiku,fable,other' })
     expect(policy.unnamedFamilies).toBe('allow')
@@ -269,5 +327,14 @@ describe('migratePolicy', () => {
     expect(migratePolicy(undefined, {})).toEqual(DEFAULT_POLICY)
     expect(migratePolicy(42, { defaultAllowed: 'gpt', fallback: 'gpt', mode: 'ask' })).toEqual(DEFAULT_POLICY)
     expect(migratePolicy({ allowed: [] }, {})).toEqual(DEFAULT_POLICY)
+  })
+  test('the defaults are never handed out to be changed', () => {
+    for (const policy of [migratePolicy(undefined, {}), migratePolicy(['opus'], {}), parsePolicy({ families: {}, versions: {} })]) {
+      if (policy === null) throw new Error('no policy')
+      expect(policy).not.toBe(DEFAULT_POLICY)
+      policy.families.opus = 'block'
+      policy.versions['opus-5'] = 'block'
+    }
+    expect(DEFAULT_POLICY).toEqual({ families: {}, unnamedFamilies: 'allow', versions: {}, fallback: 'opus', mode: 'deny' })
   })
 })

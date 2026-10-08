@@ -37,6 +37,24 @@ in this container.
 - Band (`AbovePrompt`) must size to `e.props.bodyColumns`; return `next(e)` to show nothing.
 - Render hooks never write state; writes happen in handlers via `update($, atom, fn)`.
 
+## Spike results (2026-10-08, Claude Code 2.1.293, `claude -p` + `--plugin-dir`)
+- **Models list through the session's login.** `$.session.authorize()` → `{ kind: 'bearer' }` on a
+  subscription login; `$.http.fetch('https://api.anthropic.com/v1/models?limit=1000', { auth: handle,
+  headers: { 'anthropic-version': '2023-06-01' } })` → 200, no beta header needed, no cost.
+  Body `{ data, has_more, first_id, last_id }`; each entry has `id`, `display_name`, `created_at`,
+  `type: 'model'`, and also `line` (the family, e.g. `"haiku"`), `lifecycle`, `deprecated_at`,
+  `retires_at`, `max_input_tokens`, `capabilities`. 14 models, one page.
+  `authorize()` is null on Bedrock / Vertex / gateways; `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`
+  refuses a request that carries `auth`.
+- **`$.store` across processes.** One JSON file per installed plugin:
+  `~/.claude/plugins/store/<plugin>_<source>-<hash>.json` (`<source>` is the marketplace, or `inline`
+  for `--plugin-dir` / dev folders, so a dev load has its own store). A running process sees
+  another's write on its next `get`, and keys written by different processes all survive.
+  Same key written by two processes: last write wins.
+- **Pane keyboard.** Buttons are in the pane's focus ring (Tab / arrows / click, Enter presses;
+  `autoFocus`, `$.ui.focus`), so a Button needs no `hotkey` to be reachable.
+- A plugin command run as `claude -p "/<command>"` answers without a model turn (`num_turns: 0`).
+
 ## Testing facts
 - `claude plugin test <dir>` runs `*.test.ts(x)`; `$.tool.call(...)` raises the plugin's `tool.call` hooks; the test's own `on('tool.call', ...)` stands in for core.
 - `$.ui.mount({ plugin, surface, component, requestId, props })` → `find/findAll/press/drawn`.

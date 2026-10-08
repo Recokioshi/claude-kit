@@ -146,3 +146,41 @@ export async function saveFetched(store: StorePort, result: Result<Incoming[]>, 
   await store.set(CATALOG_KEY, catalog)
   return { catalog, added: stored.fetchedAt === null ? [] : merged.added }
 }
+
+const NO_LOGIN = 'no Anthropic login in this session (Bedrock, Vertex or a gateway); the list holds the models seen in use'
+
+/**
+ * The model list refreshed through the session's login (`login` answers a
+ * fetch carrying it, or null without one): unless it is fresh and not forced.
+ * `added` lists the models new to an already-filled list.
+ */
+export async function refreshModels(
+  store: StorePort,
+  current: Catalog,
+  now: number,
+  force: boolean,
+  login: () => Promise<FetchPort | null>,
+): Promise<{ catalog: Catalog; added: CatalogEntry[]; message: string }> {
+  if (!force && !isStale(current, now)) {
+    return { catalog: current, added: [], message: `The model list is up to date (${current.entries.length} models).` }
+  }
+  let result: Result<Incoming[]>
+  try {
+    const fetchPage = await login()
+    result = fetchPage === null ? { ok: false, error: NO_LOGIN } : await fetchModels(fetchPage)
+  } catch (error) {
+    result = { ok: false, error: `the Models API could not be reached (${messageOf(error)})` }
+  }
+  const { catalog, added } = await saveFetched(store, result, now)
+  const message = result.ok ? `Model list updated: ${catalog.entries.length} models${added.length > 0 ? `, ${added.length} new` : ''}.` : `Model list not updated: ${result.error}.`
+  return { catalog, added, message }
+}
+
+/** `/models add` or `remove`, and what to say about it. */
+export async function editModels(store: StorePort, kind: 'add' | 'remove', id: string, now: number): Promise<{ catalog: Catalog; message: string }> {
+  if (kind === 'remove') {
+    return { catalog: await removeModel(store, id), message: `Took back ${id}; a model Anthropic or a session lists stays.` }
+  }
+  const { catalog, added } = await addModel(store, id, now)
+  return { catalog, message: added.length > 0 ? `Added ${id} to the model list.` : `${id} is already in the model list.` }
+}

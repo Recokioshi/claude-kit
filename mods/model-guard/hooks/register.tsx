@@ -19,7 +19,7 @@ import { addSeen, API_VERSION, changeList, editModels, GLOBAL_KEY, messageOf, re
 import type { FetchPort, StorePort } from './lists'
 import { isAllowedModel, migratePolicy } from './policy'
 import type { LegacyOptions, Policy } from './policy'
-import { cycledFallback, EMPTY_STATE, isCurrent, labelOf, nameOf, newModelText, summaryOf, toggledVersion, withEvent, withUse } from './state'
+import { cycledFallback, EMPTY_STATE, isCurrent, labelOf, nameOf, newModelText, summaryOf, toggledFamily, toggledVersion, withEvent, withUse } from './state'
 import type { GuardState } from './state'
 import { drawModels, textOf } from './view'
 
@@ -315,9 +315,12 @@ export const register: Register = (on, rawOptions) => {
       state,
       {
         toggleVersion: key => void changeFromPane($, (p, c) => toggledVersion(p, c, key)),
+        toggleFamily: family => void changeFromPane($, (p, c) => toggledFamily(p, c, family)),
         toggleExpanded: () => void update($, guard, s => ({ ...s, expanded: !s.expanded })),
+        showView: view => void update($, guard, s => ({ ...s, view })),
         cycleFallback: () => void changeFromPane($, cycledFallback),
         cycleMode: () => void changeFromPane($, p => ({ ...p, mode: p.mode === 'deny' ? ('swap' as const) : ('deny' as const) })),
+        refresh: () => void refreshList($, true).then(text => $.ui.toast(`model-guard: ${text}`)),
         // Called directly: $.command.run would skip this plugin's own command hook.
         toggleRepo: () => void switchList($, legacy, state.source === 'repo' ? 'global' : 'repo').then(text => $.ui.toast(text)),
         close: () => void $.ui.close({ id: PANE }),

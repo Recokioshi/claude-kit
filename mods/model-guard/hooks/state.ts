@@ -7,7 +7,7 @@
 import { EMPTY_CATALOG, familiesOf } from './catalog'
 import type { Catalog, CatalogEntry } from './catalog'
 import { aliasOf, familyOfKey, keyOf, KNOWN_FAMILIES } from './ids'
-import { allowedEntries, decisionFor, DEFAULT_POLICY, fallbackEntry, withVersion } from './policy'
+import { allowedEntries, decisionFor, DEFAULT_POLICY, fallbackEntry, withFamily, withUnnamed, withVersion } from './policy'
 import type { Policy } from './policy'
 
 export type Stats = { uses: number; swapped: number; denied: number }
@@ -95,6 +95,23 @@ function familyOfEntryKey(catalog: Catalog, key: string): string {
 export function toggledVersion(policy: Policy, catalog: Catalog, key: string): Policy {
   const on = decisionFor(policy, key, familyOfEntryKey(catalog, key)) === 'allow'
   return withVersion(policy, catalog, key, on ? 'block' : 'allow')
+}
+
+/** The families the pane offers a default for (known ones first); `other` stands for every family not named. */
+export function familyRowsOf(catalog: Catalog): string[] {
+  const named = [...new Set([...KNOWN_FAMILIES, ...familiesOf(catalog)])].filter(f => f !== 'other')
+  return [...named, 'other']
+}
+
+/** A family's default for versions with no rule of their own (`other`: every family not named). */
+export function familyDefaultOf(policy: Policy, family: string): 'allow' | 'block' {
+  return family === 'other' ? policy.unnamedFamilies : (policy.families[family] ?? policy.unnamedFamilies)
+}
+
+/** Flips a family's default; the same object when that would block the last allowed model. */
+export function toggledFamily(policy: Policy, catalog: Catalog, family: string): Policy {
+  const next = familyDefaultOf(policy, family) === 'allow' ? 'block' : 'allow'
+  return family === 'other' ? withUnnamed(policy, catalog, next) : withFamily(policy, catalog, family, next)
 }
 
 /** Steps the fallback to the newest allowed version of the next family that has one. */

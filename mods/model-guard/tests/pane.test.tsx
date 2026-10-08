@@ -1,14 +1,17 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { engineOf, seedList, seedPolicy, policyIn, run } from './harness'
+import { engineOf, pageOf, API_IDS, seedList, seedPolicy, policyIn, run } from './harness'
+
+type Drawing = {
+  press: (q: { key: string }) => Promise<void>
+  find: (q: { key: string }) => Promise<{ text?: string } | undefined>
+  unmount: () => Promise<void>
+}
+
+const mount = ($: { ui: { mount: (input: never) => Promise<unknown> } }, surface: 'terminal' | 'desktop' | 'mobile' | 'vscode' = 'terminal', columns = 60) =>
+  $.ui.mount({ plugin: 'model-guard', surface, component: 'Pane', requestId: 'models', props: { bodyColumns: columns } } as never) as Promise<Drawing>
 
 describe('/models pane', () => {
-  const mount = ($: { ui: { mount: (input: never) => Promise<unknown> } }, surface: 'terminal' | 'desktop' | 'mobile' | 'vscode' = 'terminal') =>
-    $.ui.mount({ plugin: 'model-guard', surface, component: 'Pane', requestId: 'models', props: { bodyColumns: 60 } } as never) as Promise<{
-      press: (q: { key: string }) => Promise<void>
-      find: (q: { key: string }) => Promise<{ text?: string } | undefined>
-      unmount: () => Promise<void>
-    }>
 
   test('the newest version of each family and every ruled one are on show; the rest are behind "more"', async ($, on) => {
     const { store } = engineOf(on)
@@ -65,5 +68,61 @@ describe('/models pane', () => {
     seedList(store)
     expect((await run($, 'opus, sonnet')).text).toContain('blocked: haiku (all), fable (all), other families')
     expect((await run($, 'gpt')).text).toContain('No model family in "gpt"')
+  })
+})
+
+describe('/models pane: new versions and the list', () => {
+  test('the new-versions view flips a family\'s default and the one for families not named', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    await run($)
+    const ui = await mount($)
+    await ui.press({ key: 'new-versions' })
+    expect((await ui.find({ key: 'head' }))?.text).toContain('new versions')
+    expect(await ui.find({ key: 'toggle-opus-5.5' })).toBeUndefined()
+    await ui.press({ key: 'family-haiku' })
+    expect(policyIn(store).families.haiku).toBe('block')
+    await ui.press({ key: 'family-other' })
+    expect(policyIn(store).unnamedFamilies).toBe('block')
+    await ui.press({ key: 'back' })
+    expect(await ui.find({ key: 'toggle-opus-5.5' })).toBeDefined()
+    expect((await ui.find({ key: 'main-family-haiku' }))?.text).toContain('new versions: blocked')
+  })
+
+  test('the list line says where the list came from, and why a refresh failed', async ($, on) => {
+    const { store, clock } = engineOf(on, { login: true, api: [{ status: 503, text: '' }] })
+    seedList(store)
+    await clock.advance(3 * 60 * 60_000)
+    await run($)
+    const ui = await mount($)
+    expect((await ui.find({ key: 'list-status' }))?.text).toContain('list: Anthropic, updated 3h ago')
+    await ui.press({ key: 'refresh' })
+    expect((await ui.find({ key: 'list-status' }))?.text).toContain('list not refreshed: the Models API answered 503')
+  })
+
+  test('refresh from the pane fetches now', async ($, on) => {
+    const { store, fetched, toasts } = engineOf(on, { login: true, api: [{ status: 200, text: pageOf(API_IDS) }] })
+    store.set('catalog', { entries: [], fetchedAt: null, lastError: null })
+    await run($)
+    const ui = await mount($)
+    expect((await ui.find({ key: 'list-status' }))?.text).toContain('list: models seen in use')
+    await ui.press({ key: 'refresh' })
+    expect(fetched.length).toBe(1)
+    expect(toasts.at(-1)).toContain('Model list updated: 14 models')
+    expect(await ui.find({ key: 'toggle-haiku-5.5' })).toBeDefined()
+  })
+
+  test('a narrow pane drops the ids; the phone gets every control', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    await run($)
+    const narrow = await mount($, 'mobile', 36)
+    expect((await narrow.find({ key: 'row-opus-5.5' }))?.text).not.toContain('claude-opus-5-5')
+    for (const key of ['more', 'new-versions', 'fallback', 'mode', 'refresh', 'repo', 'close']) {
+      expect(await narrow.find({ key })).toBeDefined()
+    }
+    await narrow.unmount()
+    const wide = await mount($, 'terminal', 80)
+    expect((await wide.find({ key: 'row-opus-5.5' }))?.text).toContain('claude-opus-5-5')
   })
 })

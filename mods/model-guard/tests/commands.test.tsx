@@ -118,3 +118,32 @@ describe('/models text forms', () => {
     expect(text).toContain('/models allow|block <model>')
   })
 })
+
+describe('/models text forms: input that names no model', () => {
+  test('junk is refused, never stored', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    expect((await run($, 'allow opus 4.8 sonnet 5')).text).toContain('is not a model')
+    expect((await run($, 'block foo')).text).toContain('"foo" is not a model')
+    expect((await run($, 'new 4.8 block')).text).toContain('Say the family and allow or block')
+    expect((await run($, 'fallback xyz')).text).toContain('"xyz" is not a model')
+    expect((await run($, 'add opus')).text).toContain('opus names no one model')
+    expect(policyIn(store).versions).toEqual({})
+    expect(policyIn(store).fallback).toBe('opus')
+  })
+
+  test('a quoted version is a version', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    expect((await run($, 'block "opus 4.8"')).text).toContain('Blocked opus 4.8.')
+  })
+
+  test('remove says what really happened', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    expect((await run($, 'remove claude-opus-5-5')).text).toBe('claude-opus-5-5 stays: Anthropic or a session lists it. /models block claude-opus-5-5 keeps it from running.')
+    expect((await run($, 'remove claude-nova-1')).text).toBe('claude-nova-1 is not in the model list.')
+    await run($, 'add claude-nova-1')
+    expect((await run($, 'remove claude-nova-1')).text).toBe('Removed claude-nova-1 from the model list.')
+  })
+})

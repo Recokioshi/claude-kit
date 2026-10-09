@@ -7,7 +7,7 @@
  */
 import { mergeCatalog, parseCatalog, parseModelsResponse, removeAdded } from './catalog'
 import type { Catalog, CatalogEntry, Incoming, Result } from './catalog'
-import { aliasOf, isInherited, splitSuffix } from './ids'
+import { aliasOf, isInherited, keyOf, splitSuffix } from './ids'
 import { migratePolicy, parsePolicy } from './policy'
 import type { LegacyOptions, Policy } from './policy'
 
@@ -58,15 +58,51 @@ export async function readLists(store: StorePort, root: string | null, legacy: L
   return repo === null ? { policy: global, source: 'global', catalog } : { policy: repo, source: 'repo', catalog }
 }
 
-/** One change to a stored list, read again first: another process may have changed it since. */
-export async function changeList(store: StorePort, key: string, current: Policy, change: (policy: Policy) => Policy): Promise<{ policy: Policy; isChanged: boolean }> {
-  const stored = parsePolicy(await store.get(key)) ?? current
+/**
+ * One change to the list in force, decided from the store, not the session's
+ * copy: another process may have changed it, given this repo its own list,
+ * or dropped that. Read, changed, written back.
+ */
+export async function changeActive(
+  store: StorePort,
+  root: string | null,
+  legacy: LegacyOptions,
+  change: (policy: Policy) => Policy,
+): Promise<{ policy: Policy; source: Lists['source']; isChanged: boolean }> {
+  const repoKey = root === null ? null : repoKeyOf(root)
+  const repoRaw = repoKey === null ? undefined : await store.get(repoKey)
+  const hasRepo = repoKey !== null && repoRaw !== undefined && repoRaw !== null
+  const stored = hasRepo ? (parsePolicy(repoRaw) ?? migratePolicy(repoRaw, legacy)) : (parsePolicy(await store.get(GLOBAL_KEY)) ?? migratePolicy(undefined, legacy))
   const policy = change(stored)
   const isChanged = policy !== stored
   if (isChanged) {
-    await store.set(key, policy)
+    await store.set(hasRepo ? repoKey : GLOBAL_KEY, policy)
   }
-  return { policy, isChanged }
+  return { policy, source: hasRepo ? 'repo' : 'global', isChanged }
+}
+
+/** The folder a list is kept for, as the session knows it. */
+export type ListPlace = { repoRoot: string | null; repoName: string | null; source: Lists['source'] }
+
+/**
+ * Gives a repo its own list (a copy of the stored global one; one another
+ * process made first is kept), or drops it. Answers what to say.
+ */
+export async function switchRepo(store: StorePort, place: ListPlace, to: Lists['source'], legacy: LegacyOptions): Promise<string> {
+  const name = place.repoName ?? 'This repo'
+  if (place.repoRoot === null) return 'This session has no folder to keep a list for.'
+  if (place.source === to) return to === 'repo' ? `${name} already has its own list. /models global goes back.` : `${name} already uses the global list.`
+  const key = repoKeyOf(place.repoRoot)
+  if (to === 'global') {
+    await store.delete(key)
+    return `${name} uses the global list again.`
+  }
+  const existing = await store.get(key)
+  if (existing !== undefined && existing !== null) {
+    return `${name} already had its own list (set in another window); it applies here now.`
+  }
+  await store.set(key, parsePolicy(await store.get(GLOBAL_KEY)) ?? migratePolicy(undefined, legacy))
+  return `${name} now has its own list, a copy of the global one. /models global goes back.`
 }
 
 /** Folds sightings into the stored list (read again first) and writes it back. */
@@ -167,7 +203,11 @@ export async function refreshModels(
   let result: Result<Incoming[]>
   try {
     const fetchPage = await login()
-    result = fetchPage === null ? { ok: false, error: NO_LOGIN } : await fetchModels(fetchPage)
+    if (fetchPage === null) {
+      // This session's own limit, not the list's: other instances may have a login.
+      return { catalog: current, added: [], message: `Model list not refreshed: ${NO_LOGIN}.` }
+    }
+    result = await fetchModels(fetchPage)
   } catch (error) {
     result = { ok: false, error: `the Models API could not be reached (${messageOf(error)})` }
   }
@@ -176,11 +216,21 @@ export async function refreshModels(
   return { catalog, added, message }
 }
 
-/** `/models add` or `remove`, and what to say about it. */
+/** `/models add` or `remove`, and what to say about it: only what really happened. */
 export async function editModels(store: StorePort, kind: 'add' | 'remove', id: string, now: number): Promise<{ catalog: Catalog; message: string }> {
-  if (kind === 'remove') {
-    return { catalog: await removeModel(store, id), message: `Took back ${id}; a model Anthropic or a session lists stays.` }
+  if (kind === 'add') {
+    const { catalog, added } = await addModel(store, id, now)
+    return { catalog, message: added.length > 0 ? `Added ${id} to the model list.` : `${id} is already in the model list.` }
   }
-  const { catalog, added } = await addModel(store, id, now)
-  return { catalog, message: added.length > 0 ? `Added ${id} to the model list.` : `${id} is already in the model list.` }
+  const before = parseCatalog(await store.get(CATALOG_KEY))
+  const entry = before.entries.find(e => e.key === keyOf(id))
+  if (entry === undefined) {
+    return { catalog: before, message: `${id} is not in the model list.` }
+  }
+  if (!entry.sources.includes('added')) {
+    return { catalog: before, message: `${id} stays: Anthropic or a session lists it. /models block ${id} keeps it from running.` }
+  }
+  const catalog = await removeModel(store, id)
+  const isGone = !catalog.entries.some(e => e.key === entry.key)
+  return { catalog, message: isGone ? `Removed ${id} from the model list.` : `${id} stays in the list: Anthropic or a session lists it too.` }
 }

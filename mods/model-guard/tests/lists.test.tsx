@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'claude-code/testing'
 
-import { engineOf, seedList, seedPolicy, policyIn, spawnOf, run, turnOf, ONLY_OPUS_48 } from './harness'
+import { engineOf, ONLY_OPUS_48, policyIn, run, seedList, seedPolicy, spawnOf, turnOf } from './harness'
 
 describe('lists: migration and sharing', () => {
   test('0.2 settings seed the global list once: families off stay blocked', { options: { defaultAllowed: 'opus,fable' } }, async ($, on) => {
@@ -48,5 +48,56 @@ describe('lists: migration and sharing', () => {
     expect(global.families.opus).not.toBe('block')
     expect((await run($, 'global')).text).toContain('web-app uses the global list again')
     expect(store.get('repo:/Users/me/dev/web-app')).toBeUndefined()
+  })
+})
+
+describe('lists: another window changed them', () => {
+  test('a pane edit keeps what another window saved in between (read, changed, written back)', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    await run($)
+    seedPolicy(store, { versions: { 'sonnet-5.5': 'block' } })
+    expect((await run($, 'block opus 5')).text).toContain('Blocked opus 5.')
+    expect(policyIn(store).versions).toEqual({ 'sonnet-5.5': 'block', 'opus-5': 'block' })
+  })
+
+  test('a repo list another window dropped is not brought back by this session\'s next edit', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    await run($, 'repo')
+    store.delete('repo:/Users/me/dev/web-app')
+    await run($, 'block opus 5')
+    expect(store.get('repo:/Users/me/dev/web-app')).toBeUndefined()
+    expect(policyIn(store).versions['opus-5']).toBe('block')
+  })
+
+  test('/models repo copies the stored global list, and keeps a repo list another window made first', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    await run($)
+    seedPolicy(store, { versions: { 'haiku-5.5': 'block' } })
+    await run($, 'repo')
+    expect(policyIn(store, 'repo:/Users/me/dev/web-app').versions['haiku-5.5']).toBe('block')
+    await run($, 'global')
+    seedPolicy(store, { mode: 'swap' }, 'repo:/Users/me/dev/web-app')
+    expect((await run($, 'repo')).text).toContain('web-app already has its own list')
+    expect(policyIn(store, 'repo:/Users/me/dev/web-app').mode).toBe('swap')
+  })
+
+  test('/models shows another window\'s change at once, without waiting for a turn', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    await run($)
+    seedPolicy(store, { versions: { 'opus-5': 'block' } })
+    expect((await run($)).text).toContain('blocked: opus 5')
+  })
+
+  test('a store that can\'t be read leaves the 0.2 settings in force, and says so', { options: { defaultAllowed: 'opus' } }, async ($, on) => {
+    const { failing, statuses, spawned } = engineOf(on)
+    failing.get = true
+    const r = await $.agent.spawn(spawnOf('sonnet'))
+    expect('deny' in r && r.deny).toContain('sonnet is blocked')
+    expect(spawned).toEqual([])
+    expect(statuses.some(s => s?.includes('saved lists unreadable') && s.includes('using the settings'))).toBe(true)
   })
 })

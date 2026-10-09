@@ -19,10 +19,12 @@ export const pageOf = (ids: readonly string[], hasMore = false) =>
 export type EngineOptions = {
   /** The session's login: a bearer handle, or none (Bedrock, Vertex, a gateway). */
   login?: boolean
-  /** The Models API's answer per request, in order; the last one repeats. */
+  /** The Models API's answer per request, in order; the last one repeats. Status 0: the fetch throws `text`. */
   api?: readonly { status: number; text: string }[]
   /** The main conversation's model, as /model shows it. */
   mainModel?: string
+  /** Files `$.fs.read` finds (a workflow's scriptPath). */
+  files?: Readonly<Record<string, string>>
 }
 
 export function engineOf(on: On, options: EngineOptions = {}) {
@@ -32,11 +34,23 @@ export function engineOf(on: On, options: EngineOptions = {}) {
   const toasts: string[] = []
   /** The shared store file, as every Claude Code process on the machine sees it. */
   const store = new Map<string, unknown>()
+  /** Flip on to make the store fail, as an unreadable or unwritable file would. */
+  const failing = { get: false, set: false }
+  const statuses: (string | undefined)[] = []
   const clock = mock.clock(on)
-  on('store.get', ($, e) => ({ value: store.get(e.key) }))
+  on('store.get', ($, e) => {
+    if (failing.get) throw new Error('store unreadable')
+    return { value: store.get(e.key) }
+  })
   on('store.set', ($, e) => {
+    if (failing.set) throw new Error('disk full')
     store.set(e.key, JSON.parse(JSON.stringify(e.value)))
     return { value: undefined }
+  })
+  on('fs.read', ($, e) => {
+    const text = options.files?.[e.path]
+    if (text === undefined) throw new Error(`no such file: ${e.path}`)
+    return { value: text }
   })
   on('store.delete', ($, e) => {
     store.delete(e.key)
@@ -52,12 +66,16 @@ export function engineOf(on: On, options: EngineOptions = {}) {
     fetched.push({ url: e.url, auth: e.init?.auth })
     const answers = options.api ?? [{ status: 200, text: pageOf(API_IDS) }]
     const answer = answers[Math.min(fetched.length - 1, answers.length - 1)] ?? { status: 500, text: '' }
+    if (answer.status === 0) throw new Error(answer.text)
     return { value: { status: answer.status, ok: answer.status < 300, headers: {}, text: answer.text } }
   })
   on('command.register', () => ({ value: { command: 'models' } }) as never)
   on('ui.open', () => ({ value: { isPlaced: true } }))
   on('ui.close', () => ({ value: undefined }))
-  on('ui.status', () => ({ value: undefined }))
+  on('ui.status', ($, e) => {
+    statuses.push(e.text)
+    return { value: undefined }
+  })
   on('ui.toast', ($, e) => {
     toasts.push(e.text)
     return { value: undefined }
@@ -72,8 +90,9 @@ export function engineOf(on: On, options: EngineOptions = {}) {
   })
   on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('classic.PostModelSwitch', () => ({}))
+  on('classic.PreModelSwitch', () => ({}))
   on('tool.call', () => ({ result: 'ran' as never }))
-  return { spawned, steps, toasts, store, fetched, clock }
+  return { spawned, steps, toasts, statuses, store, failing, fetched, clock }
 }
 
 export type Store = Map<string, unknown>
@@ -91,8 +110,11 @@ export function seedPolicy(store: Store, policy: Partial<Policy>, key = 'policy:
 
 export const policyIn = (store: Store, key = 'policy:global') => store.get(key) as Policy
 
-export const spawnOf = (model?: string, description = 'A3 soft landing') =>
-  ({ prompt: 'do it', description, subagentType: 'general-purpose', model, parentModel: 'claude-opus-5-5', background: true, fork: false }) as never
+export const spawnOf = (model?: string, description = 'A3 soft landing') => spawnWith({ model, description })
+
+/** A spawn with other fields: a fork, a workflow's agent, another parent model. */
+export const spawnWith = (fields: Readonly<Record<string, unknown>>) =>
+  ({ prompt: 'do it', description: 'A3 soft landing', subagentType: 'general-purpose', parentModel: 'claude-opus-5-5', background: true, fork: false, ...fields }) as never
 
 export const run = (engine: { command: { run: (input: never) => Promise<{ text?: string }> } }, args = '') =>
   engine.command.run({ command: 'models', args, origin: { kind: 'composer' }, presentation: { isFullscreen: false, columns: 100 } } as never)

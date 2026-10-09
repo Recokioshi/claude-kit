@@ -126,3 +126,16 @@ describe('/models pane: new versions and the list', () => {
     expect((await wide.find({ key: 'row-opus-5.5' }))?.text).toContain('claude-opus-5-5')
   })
 })
+
+describe('/models pane: when saving fails', () => {
+  test('a press whose save fails says so, and nothing claims success', async ($, on) => {
+    const { store, failing, toasts } = engineOf(on)
+    seedList(store)
+    await run($)
+    const ui = await mount($)
+    failing.set = true
+    await ui.press({ key: 'toggle-opus-5.5' })
+    expect(toasts.at(-1)).toContain('model-guard: not saved')
+    expect(policyIn(store).versions['opus-5.5']).toBeUndefined()
+  })
+})

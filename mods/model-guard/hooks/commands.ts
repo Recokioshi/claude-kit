@@ -3,8 +3,9 @@
  * text, so the phone (no input fields) and sessions that draw nothing can
  * change everything the pane can.
  */
+import { familiesOf } from './catalog'
 import type { Catalog, Result } from './catalog'
-import { aliasOf, keyOf } from './ids'
+import { aliasOf, isInherited, keyOf, KNOWN_FAMILIES, parseModelId } from './ids'
 import { withFamily, withFamilyList, withUnnamed, withVersion } from './policy'
 import type { Decision, Mode, Policy } from './policy'
 import { familyListProblem, labelOf } from './state'
@@ -35,10 +36,18 @@ export const HELP = [
 ].join('\n')
 
 const isDecision = (w: string | undefined): w is Decision => w === 'allow' || w === 'block'
+const FAMILY_WORD = /^[a-z]+$/
+/** Claude Code's own model words, which name no one model. */
+const HOST_WORDS = ['default', 'opusplan']
+
+/** Why `id` can't be added as a model (a family, inherit, a host alias), else null. */
+function idProblem(id: string): string | null {
+  return aliasOf(id) !== null || isInherited(id) || HOST_WORDS.includes(id) ? `${id} names no one model: give a model id, e.g. claude-opus-5-6.` : null
+}
 const isMode = (w: string | undefined): w is Mode => w === 'deny' || w === 'swap'
 
 export function parseCommand(args: string): Command {
-  const words = args.trim().toLowerCase().split(/[\s,;]+/).filter(Boolean)
+  const words = args.replace(/["'`]/g, ' ').trim().toLowerCase().split(/[\s,;]+/).filter(Boolean)
   const [verb, ...rest] = words
   const tail = rest.join(' ')
   switch (verb) {
@@ -49,11 +58,17 @@ export function parseCommand(args: string): Command {
       return tail === '' ? { kind: 'help', problem: `Name the model to ${verb}, e.g. /models ${verb} opus 4.8.` } : { kind: 'rule', decision: verb, target: tail }
     case 'new': {
       const [family, decision] = rest
-      return family !== undefined && isDecision(decision) && rest.length === 2 ? { kind: 'family', family, decision } : { kind: 'help', problem: 'Say the family and allow or block, e.g. /models new haiku block.' }
+      return family !== undefined && FAMILY_WORD.test(family) && isDecision(decision) && rest.length === 2
+        ? { kind: 'family', family, decision }
+        : { kind: 'help', problem: 'Say the family and allow or block, e.g. /models new haiku block.' }
     }
     case 'add':
-    case 'remove':
-      return rest.length === 1 && rest[0] !== undefined ? { kind: verb, id: rest[0] } : { kind: 'help', problem: `Give one model id, e.g. /models ${verb} claude-opus-5-6.` }
+    case 'remove': {
+      const [id] = rest
+      if (id === undefined || rest.length !== 1) return { kind: 'help', problem: `Give one model id, e.g. /models ${verb} claude-opus-5-6.` }
+      const problem = idProblem(id)
+      return problem === null ? { kind: verb, id } : { kind: 'help', problem }
+    }
     case 'refresh':
       return { kind: 'refresh' }
     case 'fallback':
@@ -86,7 +101,12 @@ export function versionOf(target: string, catalog: Catalog): Result<{ key: strin
     return { ok: false, error: `"${text}" is a whole family: name one version (e.g. ${alias.family} 4.8), or use /models new ${alias.family} allow|block.` }
   }
   const key = spaced?.[1] !== undefined && spaced[2] !== undefined ? keyOf(`${spaced[1]}-${spaced[2].replace(/-/g, '.')}`) : keyOf(text)
-  return { ok: true, value: { key, isListed: catalog.entries.some(e => e.key === key) } }
+  const isListed = catalog.entries.some(e => e.key === key)
+  // An id that does not parse is a model only when the list has it (a gateway's, added by hand).
+  if (spaced === null && parseModelId(text) === null && !isListed) {
+    return { ok: false, error: `"${text}" is not a model: name one version (opus 4.8) or a model id (claude-opus-4-8).` }
+  }
+  return { ok: true, value: { key, isListed } }
 }
 
 /** A change to the list in force, and what to say once it is saved. */
@@ -115,8 +135,11 @@ export function editOf(command: Command, catalog: Catalog): Result<PolicyEdit> |
       return { ok: true, value: { change: (p, c) => withFamilyList(p, c, command.words), done: `Allowed families: ${command.words.join(', ')}.` } }
     }
     case 'fallback': {
-      const version = versionOf(command.target, catalog)
-      const fallback = version.ok ? version.value.key : (aliasOf(command.target)?.family ?? command.target)
+      const families = new Set<string>([...KNOWN_FAMILIES, ...familiesOf(catalog)])
+      const family = families.has(command.target) ? command.target : null
+      const version = family === null ? versionOf(command.target, catalog) : null
+      if (version !== null && !version.ok) return { ok: false, error: `${version.error} For the newest allowed of a family, name the family (opus).` }
+      const fallback = family ?? version?.value.key ?? command.target
       return { ok: true, value: { change: p => ({ ...p, fallback }), done: `Fallback: ${labelOf(fallback)}.` } }
     }
     case 'mode':

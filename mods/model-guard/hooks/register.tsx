@@ -2,30 +2,38 @@
  * model-guard: choose the model versions this session may use.
  *
  * The rules and the model list live in the plugin store, shared by every
- * local Claude Code process, and are read at start, at every turn and when
- * /models opens. Spawns, subagent requests, workflows and /model are checked
- * per version; the main conversation's own model is never changed. Every `$`
- * call is in this file (the loader follows `$` only within one file); the
- * logic is in the pure modules next to it, reached through plain functions.
+ * local Claude Code process, and are read at start, at every turn and on
+ * /models. Spawns, subagent requests, workflows and /model are checked per
+ * version; the main conversation's own model is never changed. Every `$` call
+ * is in this file (the loader follows `$` only within one file); the logic is
+ * in the pure modules next to it, reached through plain functions.
  */
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { Catalog } from './catalog'
 import { editOf, fixedAnswerOf, parseCommand } from './commands'
-import { spawnDecision, stepSwap, workflowRefusal } from './decide'
-import { aliasOf, keyOf, parseModelId } from './ids'
-import { addSeen, API_VERSION, changeList, editModels, GLOBAL_KEY, messageOf, readLists, refreshModels, repoKeyOf } from './lists'
+import { spawnDecision, stepSwap, switchRefusal, workflowRefusal } from './decide'
+import { keyOf, parseModelId } from './ids'
+import { addSeen, API_VERSION, changeActive, editModels, messageOf, readLists, refreshModels, switchRepo } from './lists'
 import type { FetchPort, StorePort } from './lists'
 import { isAllowedModel, migratePolicy } from './policy'
 import type { LegacyOptions, Policy } from './policy'
-import { cycledFallback, EMPTY_STATE, isCurrent, labelOf, nameOf, newModelText, summaryOf, toggledFamily, toggledVersion, withEvent, withUse } from './state'
+import { cycledFallback, EMPTY_STATE, isCurrent, labelOf, mainModelWarningOf, nameOf, newModelText, spawnToastOf, summaryOf, toggledFamily, toggledVersion, withEvent, withUse } from './state'
 import type { GuardState } from './state'
 import { drawModels, textOf } from './view'
 
 const PANE = 'models'
 const KEEP_ONE = 'Something must stay allowed: allow another model first.'
-const guard = atom({ plugin: 'model-guard', key: 'guard' } as const, EMPTY_STATE)
+const LET_THROUGH = "model-guard: a check failed and was let through (see /models); this session's guard may be off"
+// The shape tag: a hot reload of an older build's state reads as absent, and is seeded again.
+const guard = atom({ plugin: 'model-guard', key: 'guard' } as const, EMPTY_STATE, { shape: 'guard-0.3' })
+
+/** Fail-open by choice (as 0.2): a guard that breaks lets the work through and says so, rather than stopping every agent. */
+function letThrough<E, R>($: EngineInterface, e: E, next: (e: E) => R): R {
+  $.ui.status(LET_THROUGH)
+  return next(e)
+}
 
 /** The store as plain functions, for lists.ts. */
 function storeOf($: EngineInterface): StorePort {
@@ -38,11 +46,12 @@ async function loginOf($: EngineInterface): Promise<FetchPort | null> {
   return auth === null ? null : url => $.http.fetch(url, { auth: auth.handle, headers: { 'anthropic-version': API_VERSION } })
 }
 
-/** The session's folder: its repo root, else its working directory. */
+/** The session's folder: its repo root, else its working directory; null (and said) when neither answers. */
 async function rootOf($: EngineInterface): Promise<string | null> {
   try {
     return (await $.session.repo())?.root ?? (await $.session.cwd())
-  } catch {
+  } catch (error) {
+    $.ui.status(`model-guard: this session's folder is unknown (${messageOf(error)}); only the global list applies`)
     return null
   }
 }
@@ -56,76 +65,75 @@ async function loadLists($: EngineInterface, legacy: LegacyOptions): Promise<Gua
   return read($, guard)
 }
 
-/** The session's lists, read once; a store that can't be read leaves the 0.2 settings in force. */
-async function ensureReady($: EngineInterface, legacy: LegacyOptions): Promise<GuardState> {
+/** The session's lists: read now when `fresh`, else once; a store that can't be read leaves the 0.2 settings in force. */
+async function ensureReady($: EngineInterface, legacy: LegacyOptions, fresh = false): Promise<GuardState> {
   const state = await read($, guard)
-  if (isCurrent(state)) {
+  if (isCurrent(state) && !fresh) {
     return state
   }
   try {
     return await loadLists($, legacy)
   } catch (error) {
-    $.ui.status(`model-guard: saved lists unreadable (${messageOf(error)}); using the settings`)
-    await update($, guard, () => ({ ...EMPTY_STATE, isReady: true, policy: migratePolicy(undefined, legacy) }))
+    $.ui.status(`model-guard: saved lists unreadable (${messageOf(error)}); using ${isCurrent(state) ? "this session's copy" : 'the settings'}`)
+    if (!isCurrent(state)) {
+      await update($, guard, () => ({ ...EMPTY_STATE, isReady: true, policy: migratePolicy(undefined, legacy) }))
+    }
     return read($, guard)
   }
 }
 
-/** One change to the list in force (this repo's own, else the global one). */
-async function changePolicy($: EngineInterface, change: (policy: Policy, catalog: Catalog) => Policy): Promise<{ isChanged: boolean }> {
-  const state = await read($, guard)
-  const key = state.source === 'repo' && state.repoRoot !== null ? repoKeyOf(state.repoRoot) : GLOBAL_KEY
-  const { policy, isChanged } = await changeList(storeOf($), key, state.policy, p => change(p, state.catalog))
-  await update($, guard, s => ({ ...s, policy }))
+/** One change to the list in force (this repo's own, else the global one), decided from the store. */
+async function changePolicy($: EngineInterface, legacy: LegacyOptions, change: (policy: Policy, catalog: Catalog) => Policy): Promise<{ isChanged: boolean }> {
+  const state = await ensureReady($, legacy)
+  const { policy, source, isChanged } = await changeActive(storeOf($), state.repoRoot, legacy, p => change(p, state.catalog))
+  await update($, guard, s => ({ ...s, policy, source }))
   return { isChanged }
 }
 
-/** A pane change; a refused one (it would block the last allowed model) says why. */
-async function changeFromPane($: EngineInterface, change: (policy: Policy, catalog: Catalog) => Policy): Promise<void> {
-  if (!(await changePolicy($, change)).isChanged) {
-    $.ui.toast(`model-guard: ${KEEP_ONE}`)
-  }
+/** A pane press: its work, with what it has to say (a refusal, a failure) as a toast. */
+function act($: EngineInterface, work: Promise<string | null>): void {
+  // A press has no caller to answer: the toast is where its outcome goes, failures included.
+  void work.then(text => text === null || $.ui.toast(`model-guard: ${text}`)).catch(error => $.ui.toast(`model-guard: not saved (${messageOf(error)})`))
 }
 
-/** Gives this repo a list of its own (a copy of the one in force), or drops it. */
-async function switchList($: EngineInterface, legacy: LegacyOptions, to: 'repo' | 'global'): Promise<string> {
-  const state = await read($, guard)
-  const name = state.repoName ?? 'This repo'
-  if (state.repoRoot === null) return 'This session has no folder to keep a list for.'
-  if (state.source === to) return to === 'repo' ? `${name} already has its own list. /models global goes back.` : 'This repo already uses the global list.'
-  if (to === 'repo') {
-    await $.store.set(repoKeyOf(state.repoRoot), state.policy)
-    await update($, guard, s => ({ ...s, source: 'repo' as const }))
-    return `${name} now has its own list, a copy of the global one. /models global goes back.`
-  }
-  await $.store.delete(repoKeyOf(state.repoRoot))
+/** A pane change; a refused one (it would block the last allowed model) says why. */
+async function changeFromPane($: EngineInterface, legacy: LegacyOptions, change: (policy: Policy, catalog: Catalog) => Policy, refused = KEEP_ONE): Promise<string | null> {
+  return (await changePolicy($, legacy, change)).isChanged ? null : refused
+}
+
+/** Gives this repo a list of its own (a copy of the stored global one), or drops it. */
+async function switchList($: EngineInterface, legacy: LegacyOptions, to: GuardState['source']): Promise<string> {
+  const message = await switchRepo(storeOf($), await ensureReady($, legacy, true), to, legacy)
   await loadLists($, legacy)
-  return `${name} uses the global list again.`
+  return message
 }
 
 /** Adds model ids the session saw running to the shared list (a write only when one is new). */
-async function noteSeen($: EngineInterface, models: readonly (string | null | undefined)[]): Promise<void> {
-  const catalog = await addSeen(storeOf($), (await read($, guard)).catalog, models, await $.clock.now())
+async function noteSeen($: EngineInterface, legacy: LegacyOptions, models: readonly (string | null | undefined)[]): Promise<void> {
+  const catalog = await addSeen(storeOf($), (await ensureReady($, legacy)).catalog, models, await $.clock.now())
   if (catalog !== null) {
     await update($, guard, s => ({ ...s, catalog }))
   }
 }
 
-/** Notes the main conversation's model, and says so when it runs on a blocked version. */
-async function checkMainModel($: EngineInterface, model: string | null | undefined): Promise<void> {
-  if (typeof model !== 'string' || (parseModelId(model) === null && aliasOf(model) === null)) {
+/** Notes the main conversation's model (a resolved id), and says so when it runs on a blocked version. */
+async function checkMainModel($: EngineInterface, legacy: LegacyOptions, model: string): Promise<void> {
+  await update($, guard, s => ({ ...s, mainModel: model }))
+  if (parseModelId(model) === null) {
+    // `default`, `opusplan` or an alias: the resolved id comes with the first request.
     return
   }
-  await noteSeen($, [model])
+  await noteSeen($, legacy, [model])
   const state = await read($, guard)
   if (!isAllowedModel(state.policy, state.catalog, model)) {
-    $.ui.toast(`model-guard: this conversation runs on ${labelOf(nameOf(model))}, which is blocked here. Subagents won't use it; /model switches.`)
+    $.ui.toast(mainModelWarningOf(model))
   }
 }
 
 /** The model list from Anthropic, merged into the shared one; a model new to it gets a toast. */
-async function refreshList($: EngineInterface, force: boolean): Promise<string> {
-  const { catalog, added, message } = await refreshModels(storeOf($), (await read($, guard)).catalog, await $.clock.now(), force, () => loginOf($))
+async function refreshList($: EngineInterface, legacy: LegacyOptions, force: boolean): Promise<string> {
+  const state = await ensureReady($, legacy)
+  const { catalog, added, message } = await refreshModels(storeOf($), state.catalog, await $.clock.now(), force, () => loginOf($))
   await update($, guard, s => ({ ...s, catalog }))
   const { policy } = await read($, guard)
   for (const entry of added) {
@@ -141,7 +149,7 @@ async function runCommand($: EngineInterface, legacy: LegacyOptions, args: strin
   const edit = editOf(command, catalog)
   if (edit !== null) {
     if (!edit.ok) return edit.error
-    return (await changePolicy($, edit.value.change)).isChanged ? `${edit.value.done}\n${textOf(await read($, guard))}` : KEEP_ONE
+    return (await changePolicy($, legacy, edit.value.change)).isChanged ? `${edit.value.done}\n${textOf(await read($, guard))}` : KEEP_ONE
   }
   switch (command.kind) {
     case 'open':
@@ -153,7 +161,7 @@ async function runCommand($: EngineInterface, legacy: LegacyOptions, args: strin
       return result.message
     }
     case 'refresh':
-      return refreshList($, true)
+      return refreshList($, legacy, true)
     case 'repo':
     case 'global':
       return switchList($, legacy, command.kind)
@@ -179,10 +187,10 @@ export const register: Register = (on, rawOptions) => {
       argumentHint: '[allow|block <model> | new <family> allow|block | refresh | repo | global | help]',
     })
     await ensureReady($, legacy)
-    await checkMainModel($, await $.session.model())
+    await checkMainModel($, legacy, await $.session.model())
     // After the session is up, not in its way: the list is a day fresh at most.
     $.clock.after(0, () => {
-      void refreshList($, false).catch(error => $.ui.status(`model-guard: model list not refreshed (${messageOf(error)})`))
+      void refreshList($, legacy, false).catch(error => $.ui.status(`model-guard: model list not refreshed (${messageOf(error)})`))
     })
     return next(e)
   })
@@ -192,26 +200,23 @@ export const register: Register = (on, rawOptions) => {
     const result = await next(e)
     await ensureReady($, legacy)
     return result
-  })
+  }).catch(letThrough)
 
   // Another instance may have changed the lists: every turn starts from the store.
   on('turn.start', async ($, e, next) => {
-    try {
-      await loadLists($, legacy)
-    } catch (error) {
-      $.ui.status(`model-guard: saved lists unreadable (${messageOf(error)}); using this session's copy`)
-    }
+    await ensureReady($, legacy, true)
     return next(e)
   })
 
   on('classic.PostModelSwitch', async ($, e, next) => {
     const result = await next(e)
-    await checkMainModel($, e.to_model)
+    await checkMainModel($, legacy, e.to_model)
     return result
-  })
+  }).catch(letThrough)
 
   on('command.run', { command: 'models' }, async ($, e) => {
-    await ensureReady($, legacy)
+    // Fresh from the store: another window may have changed the lists since this session's last turn.
+    await ensureReady($, legacy, true)
     const answer = await runCommand($, legacy, e.args ?? '')
     if (answer !== null) {
       return { text: answer }
@@ -230,13 +235,12 @@ export const register: Register = (on, rawOptions) => {
       return next(e)
     }
     const state = await ensureReady($, legacy)
-    const decision = spawnDecision(state.policy, state.catalog, e.model)
+    const decision = spawnDecision(state.policy, state.catalog, { model: e.model, parentModel: e.parentModel, isWorkflow: e.workflow !== undefined })
     if (decision.kind === 'deny' || decision.kind === 'swap') {
       const at = await $.clock.now()
-      const { from } = decision
       const to = decision.kind === 'swap' ? decision.to.key : undefined
-      await update($, guard, s => withEvent(s, { at, kind: decision.kind, what: e.description, from, to }))
-      $.ui.toast(to === undefined ? `model-guard: refused a ${labelOf(from)} subagent (${e.description})` : `model-guard: ${e.description}: ${labelOf(from)} → ${labelOf(to)}`)
+      await update($, guard, s => withEvent(s, { at, kind: decision.kind, what: e.description, from: decision.from, to }))
+      $.ui.toast(spawnToastOf(e.description, decision.from, to))
       await showStatus($)
     }
     if (decision.kind === 'deny') {
@@ -246,17 +250,24 @@ export const register: Register = (on, rawOptions) => {
     if ('model' in result && typeof result.model === 'string') {
       const model = result.model
       await update($, guard, s => withUse(s, keyOf(model)))
-      await noteSeen($, [model])
+      await noteSeen($, legacy, [model])
     }
     await showStatus($)
     return result
-  })
+  }).catch(letThrough)
 
   on('turn.step', async function* ($, e, next) {
-    const state = await read($, guard)
+    const state = await ensureReady($, legacy)
     const loop = e.agentId
-    const swap = !isCurrent(state) || loop === undefined ? null : stepSwap(state.policy, state.catalog, e.model)
-    if (swap === null || loop === undefined) {
+    if (loop === undefined) {
+      // The main conversation: never changed; its resolved model is checked once per switch.
+      if (state.mainModel !== e.model) {
+        await checkMainModel($, legacy, e.model)
+      }
+      return yield* next(e)
+    }
+    const swap = stepSwap(state.policy, state.catalog, e.model)
+    if (swap === null) {
       return yield* next(e)
     }
     if (!state.swappedLoops.includes(loop)) {
@@ -271,14 +282,13 @@ export const register: Register = (on, rawOptions) => {
 
   on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {
     const state = await ensureReady($, legacy)
-    const input = e as unknown as { script?: string; scriptPath?: string }
-    let script = input.script ?? ''
-    if (script === '' && typeof input.scriptPath === 'string') {
+    // The engine runs scriptPath over script; a named or resumed run is caught per agent (spawn, turn.step).
+    let script = e.script ?? ''
+    if (typeof e.scriptPath === 'string') {
       try {
-        const text = await $.fs.read(input.scriptPath)
-        script = typeof text === 'string' ? text : ''
-      } catch {
-        script = ''
+        script = await $.fs.read(e.scriptPath)
+      } catch (error) {
+        $.ui.status(`model-guard: workflow script unreadable (${messageOf(error)}); its agents are checked as they start`)
       }
     }
     const refusal = workflowRefusal(state.policy, state.catalog, script)
@@ -291,7 +301,7 @@ export const register: Register = (on, rawOptions) => {
     }
     await showStatus($)
     return { deny: refusal.reason }
-  })
+  }).catch(letThrough)
 
   on('classic.PreModelSwitch', async ($, e, next) => {
     const result = await next(e)
@@ -300,30 +310,30 @@ export const register: Register = (on, rawOptions) => {
       return result
     }
     const at = await $.clock.now()
-    const from = keyOf(e.to_model)
-    await update($, guard, s => withEvent(s, { at, kind: 'deny', what: '/model', from }))
+    await update($, guard, s => withEvent(s, { at, kind: 'deny', what: '/model', from: keyOf(e.to_model) }))
     await showStatus($)
-    return { ...result, permissionDecision: 'deny' as const, permissionDecisionReason: `${labelOf(from)} is blocked. Allow it in /models first.` }
-  })
+    return { ...result, permissionDecision: 'deny' as const, permissionDecisionReason: switchRefusal(state.policy, state.catalog, e.to_model) }
+  }).catch(letThrough)
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const t = $.ui.resolve(e)
     const state = await read($, guard)
     const columns = e.props.bodyColumns ?? e.viewport?.columns ?? 60
+    const local = (change: (s: GuardState) => GuardState) => act($, update($, guard, change).then(() => null))
     return drawModels(
       t,
       state,
       {
-        toggleVersion: key => void changeFromPane($, (p, c) => toggledVersion(p, c, key)),
-        toggleFamily: family => void changeFromPane($, (p, c) => toggledFamily(p, c, family)),
-        toggleExpanded: () => void update($, guard, s => ({ ...s, expanded: !s.expanded })),
-        showView: view => void update($, guard, s => ({ ...s, view })),
-        cycleFallback: () => void changeFromPane($, cycledFallback),
-        cycleMode: () => void changeFromPane($, p => ({ ...p, mode: p.mode === 'deny' ? ('swap' as const) : ('deny' as const) })),
-        refresh: () => void refreshList($, true).then(text => $.ui.toast(`model-guard: ${text}`)),
+        toggleVersion: key => act($, changeFromPane($, legacy, (p, c) => toggledVersion(p, c, key))),
+        toggleFamily: family => act($, changeFromPane($, legacy, (p, c) => toggledFamily(p, c, family))),
+        toggleExpanded: () => local(s => ({ ...s, expanded: !s.expanded })),
+        showView: view => local(s => ({ ...s, view })),
+        cycleFallback: () => act($, changeFromPane($, legacy, cycledFallback, 'No allowed model to fall back to yet.')),
+        cycleMode: () => act($, changeFromPane($, legacy, p => ({ ...p, mode: p.mode === 'deny' ? ('swap' as const) : ('deny' as const) }))),
         // Called directly: $.command.run would skip this plugin's own command hook.
-        toggleRepo: () => void switchList($, legacy, state.source === 'repo' ? 'global' : 'repo').then(text => $.ui.toast(text)),
-        close: () => void $.ui.close({ id: PANE }),
+        refresh: () => act($, refreshList($, legacy, true)),
+        toggleRepo: () => act($, switchList($, legacy, state.source === 'repo' ? 'global' : 'repo')),
+        close: () => act($, $.ui.close({ id: PANE }).then(() => null)),
       },
       await $.clock.now(),
       columns,

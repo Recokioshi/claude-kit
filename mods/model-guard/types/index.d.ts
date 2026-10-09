@@ -31,7 +31,6 @@ export type ModelGuardEvent = {
 }
 
 export type ModelGuardState = {
-  shape: 3
   isReady: boolean
   policy: ModelPolicy
   source: 'global' | 'repo'
@@ -43,10 +42,12 @@ export type ModelGuardState = {
   swappedLoops: string[]
   expanded: boolean
   view: 'versions' | 'families'
+  mainModel: string | null
 }
 
 declare module 'claude-code' {
   interface PluginState {
-    'model-guard': { guard: ModelGuardState }
+    /** Shaped: a reload whose code names another shape tag reads an older build's value as absent. */
+    'model-guard': { guard: Shaped<ModelGuardState> }
   }
 }

@@ -25,8 +25,6 @@ export type GuardEvent = {
 }
 
 export type GuardState = {
-  /** 3: the 0.3 shape. A state left by an older build (hot reload) is seeded again. */
-  shape: 3
   isReady: boolean
   policy: Policy
   /** Which list `policy` is: the global one, or this repo's override. */
@@ -42,10 +40,11 @@ export type GuardState = {
   /** The pane: older versions shown, and which view. */
   expanded: boolean
   view: 'versions' | 'families'
+  /** The main conversation's model as last checked, so a switch is checked once. */
+  mainModel: string | null
 }
 
 export const EMPTY_STATE: GuardState = {
-  shape: 3,
   isReady: false,
   policy: DEFAULT_POLICY,
   source: 'global',
@@ -57,12 +56,12 @@ export const EMPTY_STATE: GuardState = {
   swappedLoops: [],
   expanded: false,
   view: 'versions',
+  mainModel: null,
 }
 
-/** A state this build can use: seeded, and of the 0.3 shape. */
-export function isCurrent(state: unknown): state is GuardState {
-  const s = state as Partial<GuardState> | null
-  return s !== null && typeof s === 'object' && s.shape === 3 && s.isReady === true
+/** A state read from the store and ready to use (the atom's shape tag keeps out an older build's value). */
+export function isCurrent(state: GuardState): boolean {
+  return state.isReady
 }
 
 const ZERO: Stats = { uses: 0, swapped: 0, denied: 0 }
@@ -200,4 +199,14 @@ export function familyListProblem(words: readonly string[], catalog: Catalog): s
     return null
   }
   return `No model family in "${unknown.join(' ') || words.join(' ')}". Use any of: ${[...known].join(', ')}.`
+}
+
+/** The toast for a refused or swapped spawn. */
+export function spawnToastOf(description: string, from: string, to: string | undefined): string {
+  return to === undefined ? `model-guard: refused a ${labelOf(from)} subagent (${description})` : `model-guard: ${description}: ${labelOf(from)} → ${labelOf(to)}`
+}
+
+/** The toast when the main conversation runs on a blocked version. */
+export function mainModelWarningOf(model: string): string {
+  return `model-guard: this conversation runs on ${labelOf(nameOf(model))}, which is blocked here. Subagents won't use it; /model switches.`
 }

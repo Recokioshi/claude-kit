@@ -15,7 +15,7 @@ Pick what you need; every piece works on its own.
 | **Mods** | | |
 | `git-gate` | Commits, pushes, PRs, merges and destructive git run only when your message asked for them; everything else is refused before it runs | automatic · `/git-gate` |
 | `progress-pane` | A one-line progress band above the prompt and a `/progress` pane: plan, step details, log, and the questions Claude is waiting on, answerable from the pane while it works | automatic during `/kickoff` · `/progress` |
-| `model-guard` | Choose which models Claude and its subagents may use, per session, per repo or for everything | `/models` |
+| `model-guard` | Choose which model versions Claude and its subagents may use (allow Opus 4.8, block Opus 5), in one list every window on the machine shares, or per repo | `/models` |
 | `handoff` | Writes the state of a task (done, open, decisions, gotchas) for the next repo or session to pick up | `/handoff [to <repo>]` · `/handoff pick` |
 
 **Cost:** the three skills add ≈ 420 tokens to every session (their descriptions) and
@@ -107,7 +107,7 @@ text there.
 | What | Where |
 |---|---|
 | protected branches, default PR base per repo (`owner/repo=branch`) | `/plugin configure git-gate@claude-kit` |
-| models allowed by default, fallback, deny or swap | `/models` → `g` (global), `s` (this repo) |
+| model versions allowed, new-version defaults, fallback, deny or swap | `/models` (saved at once for every window); `s` gives a repo its own list |
 | a repo's gate command and PR base for `/ship` | `.claude/ship.json` in that repo: `{"gate": "npm test", "prBase": "develop"}` |
 
 Each mod's README has the details: [git-gate](mods/git-gate/README.md) ·

@@ -55,7 +55,31 @@ in this container.
   `autoFocus`, `$.ui.focus`), so a Button needs no `hotkey` to be reachable.
 - A plugin command run as `claude -p "/<command>"` answers without a model turn (`num_turns: 0`).
 
+## Facts from building model-guard 0.3 (Claude Code 2.1.293)
+- **`$` never crosses an import.** `claude plugin validate` refuses `helper($)` when `helper` is
+  imported ("$ is followed only into a function declared in this same file"). Keep every `$` call
+  in the hooks module and hand other modules plain functions (`{ get: k => $.store.get(k) }`).
+- **Shaped state for hot reload:** `atom(ref, initial, { shape: 'tag' })` with the contract key
+  declared `Shaped<T>` (no import in the contract: it must be self-contained; `Shaped` is in scope
+  inside `declare module 'claude-code'`). A reload whose code names another tag reads the old
+  value as absent.
+- **Guards and `.catch`:** without one, a hook that throws is skipped (fail-open, silently).
+  `on(...).catch(($, e, next) => next(e))` makes the choice explicit; `next` is replay-safe there.
+- **`agent.spawn` for a workflow's agent** (`e.workflow` set): only a `{ deny }` applies; a
+  rewritten `model` is ignored.
+- **`Workflow` input:** `scriptPath` takes precedence over `script` and `name`.
+- **`turn.step`** carries the resolved model id (`e.model`); `$.session.model()` answers as
+  `/model` shows it, which may be an alias or `default`.
+- **`$.http.fetch(url, { auth })`** sets the session's credential header itself, first-party
+  hosts only; `$.session.authorize()` is null without a first-party login.
+
 ## Testing facts
 - `claude plugin test <dir>` runs `*.test.ts(x)`; `$.tool.call(...)` raises the plugin's `tool.call` hooks; the test's own `on('tool.call', ...)` stands in for core.
 - `$.ui.mount({ plugin, surface, component, requestId, props })` → `find/findAll/press/drawn`.
 - `claude plugin validate <dir>` lists hooks, `$` calls and state reads/writes per module.
+- A test's `$` has no `store`: stub `store.get/set/delete/keys` with `on(...)` over a `Map` to
+  play "another process" and to read what was written. `mock.store(on, entries)` only seeds.
+- Test stubs (`on(...)`) must be registered before the test first calls `$`, once per event.
+- A test hook that throws is skipped: the plugin sees "no implementation for <event>", not the
+  thrown message. `$.session.start(...)` fires `session.start`; `clock.advance` / `clock.settle`
+  run `$.clock.after` timers.

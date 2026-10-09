@@ -81,8 +81,11 @@ export function parseCommand(args: string): Command {
     case 'save':
       return { kind: 'repo' }
     case 'global':
-    case 'reset':
       return { kind: 'global' }
+    case 'reset':
+      // 0.2's reset went back to the saved choice; 0.3 saves every change at once, and
+      // mapping it to `global` would silently discard a repo's own rules.
+      return { kind: 'help', problem: 'Every change is saved at once now, so there is nothing to reset. /models global drops this repo\'s own list (its rules are discarded).' }
     case 'default':
       return { kind: 'default' }
     case 'help':

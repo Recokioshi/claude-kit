@@ -278,6 +278,9 @@ export const register: Register = (on, rawOptions) => {
       await showStatus($)
     }
     return yield* next({ ...e, model: swap.model })
+  }).catch(async function* ($, e, next) {
+    $.ui.status(LET_THROUGH)
+    return yield* next(e)
   })
 
   on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {

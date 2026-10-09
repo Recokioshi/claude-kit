@@ -15,8 +15,13 @@ describe('parseCommand and versionOf', () => {
     expect(Hooks.parseCommand('fallback opus 4.8')).toEqual({ kind: 'fallback', target: 'opus 4.8' })
     expect(Hooks.parseCommand('mode swap')).toEqual({ kind: 'mode', mode: 'swap' })
     expect(Hooks.parseCommand('save')).toEqual({ kind: 'repo' })
-    expect(Hooks.parseCommand('reset')).toEqual({ kind: 'global' })
     expect(Hooks.parseCommand('opus, sonnet')).toEqual({ kind: 'families', words: ['opus', 'sonnet'] })
+  })
+
+  test('reset, a 0.2 habit, explains instead of dropping a repo\'s list', () => {
+    const reset = Hooks.parseCommand('reset')
+    expect(reset.kind).toBe('help')
+    expect(reset.kind === 'help' && reset.problem).toContain('nothing to reset')
   })
 
   test('an incomplete form explains itself', () => {

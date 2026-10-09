@@ -23,7 +23,7 @@ Tested with Claude Code 2.1.293.
  o: ▸ 9 older versions
  n: new versions…   f: fallback: opus 5.5   m: explicit asks: deny
  RECENT
- 2m  ~ agent 3f2a91c0  opus 5 → opus 5.5
+ 2m  ✗ lint fixes  opus 5 refused
  u: Refresh list   s: Separate list for web-app   x: Close
 ```
 - On show: the newest version of each family, plus every version you set a rule for. `o` shows
@@ -39,7 +39,7 @@ Tested with Claude Code 2.1.293.
   gets an error naming the model to use, and picks again) or `swap` (it runs on the newest
   allowed version of the same family, else the fallback).
 - `s` gives this repo a list of its own, a copy of the global one; pressed again, the repo goes
-  back to the global list.
+  back to the global list and its own rules are discarded.
 - `u` refreshes the model list now. The line under the header says where the list came from and
   when, or why the last refresh failed.
 - It works the same on the phone (no input fields there).
@@ -55,19 +55,22 @@ Everything the pane does, as text, for the phone, cloud sessions and `claude -p`
 /models refresh                      the list from Anthropic now
 /models fallback <model>             a version, or a family (its newest allowed version)
 /models mode deny|swap
-/models repo · global                this repo gets its own list · back to the global one
+/models repo · global                this repo gets its own list · back to the global one (its rules are discarded)
 /models help
 ```
 A family is not a version: `/models block opus` asks you to name one (`opus 5`) or to use
 `/models new opus block`. A rule for a version the list does not have yet is kept and applies
-once it appears. The 0.2 forms still work: `/models opus,sonnet` allows those families and
-blocks the others; `save` is `repo`, `reset` is `global`.
+once it appears. From 0.2, `/models opus,sonnet` still allows those families and blocks the others,
+and `save` is `repo`. `reset` and `default` only explain: every change is now saved at once, for
+every window, so there is nothing to reset or to save as a default.
 
 ## Where the model list comes from
 - **Anthropic's Models API**, through the session's own login (the mod never sees the
   credential): at session start when the list is more than a day old, and on `u` or
-  `/models refresh`. A model new to the list gets one toast, e.g. `new model Claude Opus 5.6
-  (claude-opus-5-6), allowed. /models to change.` The very first fill announces nothing.
+  `/models refresh`. A model new to the list gets one toast, e.g. `model-guard: new model Claude
+  Opus 5.6 (claude-opus-5-6), allowed. /models to change.` The very first fill announces nothing.
+  With `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC` set, the API is never reached: every start tries
+  again, the pane's list line says why, and the list comes from the two sources below.
 - **Models sessions run**: the main conversation's model, `/model` switches, and what subagents
   ran on. On Bedrock, Vertex or a gateway, where there is no Anthropic login to ask with, this
   is where the list comes from.
@@ -87,6 +90,7 @@ the spelling of the requester's provider when the list has it.
 | A workflow's agents | refused in `deny` mode; in `swap` mode their requests are swapped as above |
 | `Workflow` script (or `scriptPath`) containing `model: 'claude-opus-5'` | refused before it starts |
 | `/model claude-opus-5` | refused, naming the allowed version to pick |
+| `/model opus` (an alias) | goes through while any Opus version is allowed; if the host then runs a blocked one, the main-model toast says so |
 | Your main conversation's own model | left alone (that is your `/model` choice); a toast says when it runs on a blocked version |
 
 A status line (`model-guard: blocked: opus 5 · 2 swapped`) appears only after something was
@@ -105,7 +109,9 @@ machines or cloud sessions.
 Nothing to do. The first 0.3 session turns your 0.2 choice into the global list: families you
 had on stay allowed, families you had off are blocked (their new versions too), and a repo you
 saved with `s` keeps its choice as that repo's own list. The settings rows (`/config` →
-model-guard) are read only for that first seeding; after it, change things in `/models`.
+model-guard) seed the global list that first time, fill in the fallback and mode for a 0.2 repo
+choice that had none, and stand in whenever the saved lists can't be read. Otherwise change
+things in `/models`.
 
 ## Notes
 - For an organization-wide hard limit, use managed `availableModels`. This mod is the

@@ -63,22 +63,25 @@ in this container.
   declared `Shaped<T>` (no import in the contract: it must be self-contained; `Shaped` is in scope
   inside `declare module 'claude-code'`). A reload whose code names another tag reads the old
   value as absent.
-- **Guards and `.catch`:** without one, a hook that throws is skipped (fail-open, silently).
-  `on(...).catch(($, e, next) => next(e))` makes the choice explicit; `next` is replay-safe there.
+- **Guards and `.catch`:** without one, a hook that throws is skipped: the request goes on
+  (fail-open) and the engine reports the failure by name, not in the mod's own words. A `.catch`
+  (an async generator one for `turn.step`) makes the choice explicit; `next` is replay-safe there.
 - **`agent.spawn` for a workflow's agent** (`e.workflow` set): only a `{ deny }` applies; a
   rewritten `model` is ignored.
 - **`Workflow` input:** `scriptPath` takes precedence over `script` and `name`.
 - **`turn.step`** carries the resolved model id (`e.model`); `$.session.model()` answers as
   `/model` shows it, which may be an alias or `default`.
-- **`$.http.fetch(url, { auth })`** sets the session's credential header itself, first-party
-  hosts only; `$.session.authorize()` is null without a first-party login.
+- **The store file** is named from `sha256("<plugin>@<marketplace>")[:12]`, not the version or
+  the folder: every install of one plugin from one marketplace (desktop's cached copy, terminals
+  reading the clone) shares it, and it survives upgrades.
 
 ## Testing facts
 - `claude plugin test <dir>` runs `*.test.ts(x)`; `$.tool.call(...)` raises the plugin's `tool.call` hooks; the test's own `on('tool.call', ...)` stands in for core.
 - `$.ui.mount({ plugin, surface, component, requestId, props })` → `find/findAll/press/drawn`.
 - `claude plugin validate <dir>` lists hooks, `$` calls and state reads/writes per module.
-- A test's `$` has no `store`: stub `store.get/set/delete/keys` with `on(...)` over a `Map` to
-  play "another process" and to read what was written. `mock.store(on, entries)` only seeds.
+- A test's `$` has no `store`. `mock.store(on, entries)` answers get/set/delete/keys from memory,
+  but the test gets no handle on it: to read what was written, or to play "another process",
+  stub `store.get/set/delete/keys` with `on(...)` over a `Map`.
 - Test stubs (`on(...)`) must be registered before the test first calls `$`, once per event.
 - A test hook that throws is skipped: the plugin sees "no implementation for <event>", not the
   thrown message. `$.session.start(...)` fires `session.start`; `clock.advance` / `clock.settle`

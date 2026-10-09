@@ -152,3 +152,24 @@ describe('enforcement: the paths around a spawn', () => {
     expect((r as { permissionDecisionReason?: string }).permissionDecisionReason).toBe('opus 5 is blocked. opus 4.8 (claude-opus-4-8) is allowed; change it in /models.')
   })
 })
+
+describe('enforcement: a check that fails', () => {
+  test('a spawn whose check throws is let through, and the status line says so', async ($, on) => {
+    const { spawned, statuses, store } = engineOf(on)
+    seedList(store)
+    seedPolicy(store, ONLY_OPUS_48)
+    // No parent model: the alias rewrite cannot pick a spelling, and the check throws.
+    await $.agent.spawn(spawnWith({ model: 'opus', parentModel: undefined }))
+    expect(spawned).toEqual(['opus'])
+    expect(statuses.some(s => s?.includes('a check failed and was let through'))).toBe(true)
+  })
+
+  test('a request whose check throws goes on, and the status line says so', async ($, on) => {
+    const { steps, statuses, store } = engineOf(on)
+    seedList(store)
+    await run($)
+    await stepOn($, undefined as never)
+    expect(steps).toEqual([undefined])
+    expect(statuses.some(s => s?.includes('a check failed and was let through'))).toBe(true)
+  })
+})

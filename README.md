@@ -23,8 +23,8 @@ Pick what you need; every piece works on its own.
 and a short contract while a worklog is active.
 
 ## Requirements
-- Claude Code **2.1.287 or newer** (mods need it; check with `claude --version`, update with
-  `claude update`). Mods are an early-access feature: re-run the tests after a Claude Code update.
+- Claude Code **2.1.287 or newer** (mods need it; model-guard 0.3 was tested on 2.1.293; check
+  with `claude --version`, update with `claude update`). Mods are an early-access feature: re-run the tests after a Claude Code update.
 - macOS or Linux, bash (the 3.2 that macOS ships is fine).
 - Windows: use WSL, with Claude Code installed inside it, and clone the kit from the WSL shell
   (e.g. `~/claude-kit`, not a folder under `/mnt/c`). Everything then works in Claude Code sessions
@@ -50,7 +50,7 @@ claude-kit  pick what to install (↑↓ move · space toggle · a all · n none
   Mods
     [x] git-gate       installed   git writes only when you asked (commit, push, PR, merge); no UI
     [x] progress-pane  installed   live worklog band + /progress pane; answer Claude's questions mid-run
-    [ ] model-guard    —           /models: choose which models Claude and its agents may use
+    [ ] model-guard    —           /models: choose which model versions Claude and its agents may use
     [ ] handoff        —           /handoff: carry a task's state to another repo or session
 ```
 It then shows the plan (install, update, remove) and asks before applying it. Afterwards, start

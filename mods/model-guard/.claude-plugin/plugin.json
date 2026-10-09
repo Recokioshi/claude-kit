@@ -10,21 +10,27 @@
     "defaultAllowed": {
       "type": "string",
       "title": "Allowed by default",
-      "description": "Read once, by the first 0.3 session, to seed the global list (the 0.2 setting): comma-separated families allowed (opus, sonnet, haiku, fable, other). After that, change things in /models.",
+      "description": "Seeds the global list on the first 0.3 session (the 0.2 setting), and stands in when the saved lists can't be read: comma-separated families allowed (opus, sonnet, haiku, fable, other). Otherwise change things in /models.",
       "required": false,
       "default": "opus,sonnet,haiku,fable,other"
     },
     "fallback": {
       "type": "string",
       "title": "Fallback model",
-      "description": "Read once, to seed the global list: where requests on a blocked version go when their family has nothing allowed. After that, /models (f).",
+      "description": "Seeds the global list (and fills a 0.2 repo choice that had none): where requests on a blocked version go when their family has nothing allowed. Otherwise /models (f).",
       "required": false,
-      "default": "opus"
+      "default": "opus",
+      "options": [
+        "opus",
+        "sonnet",
+        "fable",
+        "haiku"
+      ]
     },
     "mode": {
       "type": "string",
-      "title": "Explicit asks for a model that is off",
-      "description": "Read once, to seed the global list. deny: refuse the spawn so Claude picks again; swap: run it on an allowed version. After that, /models (m).",
+      "title": "Explicit asks for a blocked version",
+      "description": "Seeds the global list (and fills a 0.2 repo choice that had none). deny: refuse the spawn so Claude picks again; swap: run it on an allowed version. Otherwise /models (m).",
       "required": false,
       "default": "deny",
       "options": [

@@ -260,6 +260,26 @@ describe('watching the session', () => {
     expect((await progress($, 'text')).text).toContain('commit 1234567 not linked to a step')
   })
 
+  test('drift with nothing asked: the band shows "~ 1", not "!", and opens what was noticed', async ($, on) => {
+    const quiet = SAMPLE.replace('- [~] A3', '- [ ] A3').replace('- [!] A4 Billing', '- [ ] A4 Billing')
+      .replace('- [?] D1 Bill per seat or per workspace? — options: per seat / per workspace\n', '')
+      .replace('- [!] A4 Payment sandbox key missing in .env.local\n', '')
+    engineOf(on, { [`${ROOT}/plans/a-worklog.md`]: quiet }, () => ({ ok: true, text: '[main 1234567] feat: x' }), () => ({ exitCode: 0, stdout: 'src/app.ts\n' }))
+    await start($)
+    await $.tool.call({ tool: 'Bash', command: 'git commit -m "feat: x"' } as never)
+    const band = await $.ui.mount({ plugin: 'progress-pane', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 3, bodyColumns: 120 } as never })
+    const drawn = JSON.stringify(await band.drawn())
+    expect(drawn).toContain('~ ')
+    expect(drawn).not.toContain('! ')
+    await progress($)
+    const overview = await $.ui.mount({ plugin: 'progress-pane', surface: 'terminal', component: 'Pane', requestId: 'progress', props: { bodyColumns: 64, placement: 'dock', scroll: { offset: 0, bodyRows: 30 } } as never })
+    expect(await overview.find({ text: /~ NOTICED/ })).toBeDefined()
+    expect(JSON.stringify(await overview.drawn())).not.toContain('NEEDS YOU')
+    await band.press({ key: 'band-needs-d' })
+    expect(await overview.find({ text: /Nothing waiting on you/ })).toBeDefined()
+    expect(await overview.find({ text: /commit 1234567 not linked to a step/ })).toBeDefined()
+  })
+
   test('the contract joins the system prompt only while a worklog is active', async ($, on) => {
     engineOf(on, { [`${ROOT}/plans/a-worklog.md`]: SAMPLE })
     await start($)

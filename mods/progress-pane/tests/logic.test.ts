@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'claude-code/testing'
 
 import Hooks from '../hooks'
-import type { Facts, OpContext, Worklog } from '../hooks'
+import type { Drift, Facts, OpContext, ViewData, Worklog } from '../hooks'
 
 export const SAMPLE = `---
 worklog: 1
@@ -343,6 +343,27 @@ describe('band layout', () => {
     expect(t.left).toContain('A3')
     expect(t.left.length + t.right.length).toBeLessThanOrEqual(40)
     expect(t.right).toBe('? 1  ! 1')
+  })
+  const drift = (...rules: Drift['rule'][]): Drift[] => rules.map(rule => ({ rule, text: `${rule} drift`, at: 0 }))
+  const right = (d: ViewData, cols = 140) => Hooks.bandSegments(d, cols).right.map(s => s.text).join('')
+  test('drift alone is "~ n", not "!": nothing is waiting on the person', () => {
+    const quiet = { ...data(), doc: { ...parsed(), attention: [] }, drift: drift('D1', 'D2', 'D3') }
+    expect(right(quiet)).toBe('~ 3')
+    expect(Hooks.healthOf(quiet).glyph).toBe('▶')
+  })
+  test('decisions, blockers and drift each keep their own glyph', () => {
+    expect(right({ ...data(), drift: drift('D1', 'D4') })).toBe('? 1  ! 1  ~ 2')
+    const noAsk = { ...data(), doc: { ...parsed(), attention: parsed().attention.filter(a => a.kind === 'blocker') }, drift: drift('D1') }
+    expect(right(noAsk)).toBe('! 1  ~ 1')
+  })
+  test('a red gate is the health glyph, not a "~" count', () => {
+    expect(right({ ...data(), drift: drift('D6') })).toBe('? 1  ! 1')
+  })
+  test('very narrow with all three counts: still fits', () => {
+    const { left, right: r } = Hooks.bandSegments({ ...data(), drift: drift('D1', 'D2') }, 40)
+    expect(r.map(s => s.text).join('')).toBe('? 1  ! 1  ~ 2')
+    expect(left.map(s => s.text).join('')).toContain('A3')
+    expect(left.map(s => s.text).join('').length + r.map(s => s.text).join('').length).toBeLessThanOrEqual(40)
   })
   test('the PLAN rule clips its phase chips so the row never passes the width', () => {
     const chips = Array.from({ length: 12 }, (_, i) => `○${'ABCDEFGHIJKL'[i]}`).join(' ')

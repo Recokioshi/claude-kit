@@ -95,7 +95,9 @@ export function bandSegments(data: ViewData, columns: number): { left: Seg[]; ri
   const gate = gateText(facts, now)
   const commit = facts.commits[facts.commits.length - 1]
   const decisions = doc.attention.filter(a => a.kind === 'decision').length
-  const needs = doc.attention.filter(a => a.kind === 'blocker').length + data.drift.filter(d => d.rule !== 'D6').length
+  const blockers = doc.attention.filter(a => a.kind === 'blocker').length
+  // A red gate (D6) is the health glyph, not a count.
+  const noticed = data.drift.filter(d => d.rule !== 'D6').length
   const bar = meter(done, total, 10)
 
   const left: Seg[] = [
@@ -109,10 +111,12 @@ export function bandSegments(data: ViewData, columns: number): { left: Seg[]; ri
     ...(commit ? [{ key: 'git', text: ` · ${commit.sha} ${ago(now - commit.at)}`, dim: true, drop: 5 }] : []),
     ...(data.startedMs ? [{ key: 'elapsed', text: ` · ${elapsedOf(data)}`, dim: true, drop: 7 }] : []),
   ]
+  // Decisions and blockers wait on the person; drift is only noticed.
   const right: Seg[] = [
     ...(decisions > 0 ? [{ key: 'q', text: `? ${decisions}`, tone: 'warning', bold: true, drop: 0 }] : []),
-    ...(needs > 0 ? [{ key: 'n', text: `${decisions > 0 ? '  ' : ''}! ${needs}`, tone: 'error', bold: true, drop: 0 }] : []),
-  ]
+    ...(blockers > 0 ? [{ key: 'n', text: `! ${blockers}`, tone: 'error', bold: true, drop: 0 }] : []),
+    ...(noticed > 0 ? [{ key: 'd', text: `~ ${noticed}`, tone: 'warning', bold: true, drop: 0 }] : []),
+  ].map((s, i) => (i === 0 ? s : { ...s, text: `  ${s.text}` }))
 
   const width = (segs: Seg[]) => segs.reduce((n, s) => n + s.text.length, 0)
   const room = columns - width(right) - 3
@@ -162,8 +166,8 @@ export function drawBand(t: ElementTable, data: ViewData, columns: number, actio
       })}
       <Box flexGrow={1} />
       {right.map(s => {
-        // `? 1` / `! 2`: the glyph keeps its color, the count is the button.
-        const m = /^(\s*)([?!]) (\d+)$/.exec(s.text)
+        // `? 1` / `! 2` / `~ 3`: the glyph keeps its color, the count is the button.
+        const m = /^(\s*)([?!~]) (\d+)$/.exec(s.text)
         if (!actions || !m) return <Text key={`b-${s.key}`} color={s.tone} bold={s.bold}>{s.text}</Text>
         return (
           <Box key={`b-${s.key}`} flexDirection="row">
@@ -287,7 +291,7 @@ function needsBlock(t: ElementTable, data: ViewData, columns: number, max: numbe
   if (items.length === 0) return []
   const shown = items.slice(0, max)
   return [
-    rule(t, 'needs-head', '! NEEDS YOU', columns),
+    rule(t, 'needs-head', items.some(n => n.isAsk) ? '! NEEDS YOU' : '~ NOTICED', columns),
     ...shown.map((n, i) => (
       <Box key={`n-${i}`} flexDirection="row">
         <Text color={n.tone} bold> {n.glyph} </Text>

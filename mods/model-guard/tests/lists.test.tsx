@@ -101,3 +101,41 @@ describe('lists: another window changed them', () => {
     expect(statuses.some(s => s?.includes('saved lists unreadable') && s.includes('using the settings'))).toBe(true)
   })
 })
+
+describe('lists: rows, so two windows never overwrite each other', () => {
+  test('an edit writes only the row it changes', async ($, on) => {
+    const { store, writes } = engineOf(on)
+    seedList(store)
+    await run($)
+    writes.length = 0
+    await run($, 'block opus 5')
+    expect(writes).toEqual(['policy:global|version|opus-5'])
+    await run($, 'new haiku block')
+    await run($, 'mode swap')
+    expect(writes).toEqual(['policy:global|version|opus-5', 'policy:global|family|haiku', 'policy:global|mode'])
+  })
+
+  test('another window\'s row written between this session\'s read and its write survives', async ($, on) => {
+    const { store, race } = engineOf(on)
+    seedList(store)
+    await run($)
+    race.beforeSet = key => {
+      if (key === 'policy:global|version|opus-5') store.set('policy:global|version|haiku-4.5', 'block')
+    }
+    await run($, 'block opus 5')
+    expect(policyIn(store).versions).toEqual({ 'opus-5': 'block', 'haiku-4.5': 'block' })
+  })
+
+  test('a dropped repo list takes its rows along; a new copy starts clean from the global list', async ($, on) => {
+    const { store } = engineOf(on)
+    seedList(store)
+    await run($, 'repo')
+    await run($, 'block sonnet 5')
+    expect(store.has('repo:/Users/me/dev/web-app|version|sonnet-5')).toBe(true)
+    await run($, 'global')
+    expect([...store.keys()].some(k => k.startsWith('repo:/Users/me/dev/web-app'))).toBe(false)
+    store.set('repo:/Users/me/dev/web-app|version|opus-5', 'block')
+    await run($, 'repo')
+    expect(policyIn(store, 'repo:/Users/me/dev/web-app').versions).toEqual({})
+  })
+})

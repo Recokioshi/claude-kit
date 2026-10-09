@@ -1,6 +1,6 @@
 # Plan: model-guard 0.3 — choose model versions, not families
 
-Status: proposed · Target: `mods/model-guard` 0.2.0 → 0.3.0
+Status: implemented on `model-guard-per-version` (worklog: `plans/2026-10-08-model-guard-0-3-choose-model-versions-no-worklog.md`) · Target: `mods/model-guard` 0.2.0 → 0.3.0
 
 ## Why
 - The rows (`FAMILIES`) and the ids next to them (`DEFAULT_IDS`) are hardcoded in

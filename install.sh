@@ -33,7 +33,7 @@ CATALOG=(
   "skill|report|/report: short, visual status reports for Slack/Teams, meetings or decks"
   "mod|git-gate|git writes only when you asked (commit, push, PR, merge); no UI"
   "mod|progress-pane|live worklog band + /progress pane; answer Claude's questions mid-run"
-  "mod|model-guard|/models: choose which models Claude and its agents may use"
+  "mod|model-guard|/models: choose which model versions Claude and its agents may use"
   "mod|handoff|/handoff: carry a task's state to another repo or session"
 )
 

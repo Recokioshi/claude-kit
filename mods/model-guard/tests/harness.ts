@@ -36,6 +36,9 @@ export function engineOf(on: On, options: EngineOptions = {}) {
   const store = new Map<string, unknown>()
   /** Flip on to make the store fail, as an unreadable or unwritable file would. */
   const failing = { get: false, set: false }
+  /** Every key written, in order; `beforeSet` plays another window writing just before this one. */
+  const writes: string[] = []
+  const race: { beforeSet?: (key: string) => void } = {}
   const statuses: (string | undefined)[] = []
   const clock = mock.clock(on)
   on('store.get', ($, e) => {
@@ -44,6 +47,8 @@ export function engineOf(on: On, options: EngineOptions = {}) {
   })
   on('store.set', ($, e) => {
     if (failing.set) throw new Error('disk full')
+    race.beforeSet?.(e.key)
+    writes.push(e.key)
     store.set(e.key, JSON.parse(JSON.stringify(e.value)))
     return { value: undefined }
   })
@@ -92,7 +97,7 @@ export function engineOf(on: On, options: EngineOptions = {}) {
   on('classic.PostModelSwitch', () => ({}))
   on('classic.PreModelSwitch', () => ({}))
   on('tool.call', () => ({ result: 'ran' as never }))
-  return { spawned, steps, toasts, statuses, store, failing, fetched, clock }
+  return { spawned, steps, toasts, statuses, store, failing, writes, race, fetched, clock }
 }
 
 export type Store = Map<string, unknown>
@@ -108,7 +113,9 @@ export function seedPolicy(store: Store, policy: Partial<Policy>, key = 'policy:
   store.set(key, { ...Hooks.DEFAULT_POLICY, ...policy })
 }
 
-export const policyIn = (store: Store, key = 'policy:global') => store.get(key) as Policy
+/** A stored list as every instance reads it: its base record with its rows laid over it. */
+export const policyIn = (store: Store, key = 'policy:global'): Policy =>
+  Hooks.withRows(store.get(key) as Policy, key, [...store.entries()].filter(([k]) => Hooks.isRowOf(key, k)))
 
 export const spawnOf = (model?: string, description = 'A3 soft landing') => spawnWith({ model, description })
 

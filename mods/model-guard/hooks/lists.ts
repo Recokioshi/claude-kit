@@ -10,11 +10,13 @@ import type { Catalog, CatalogEntry, Incoming, Result } from './catalog'
 import { aliasOf, isInherited, keyOf, splitSuffix } from './ids'
 import { migratePolicy, parsePolicy } from './policy'
 import type { LegacyOptions, Policy } from './policy'
+import { changedRows, isRowOf, withRows } from './rows'
 
 export type StorePort = {
   get: (key: string) => Promise<unknown>
   set: (key: string, value: unknown) => Promise<void>
   delete: (key: string) => Promise<void>
+  keys: () => Promise<string[]>
 }
 
 /** One GET through the session's own login. */
@@ -35,25 +37,38 @@ export type Lists = { policy: Policy; source: 'global' | 'repo'; catalog: Catalo
 export const messageOf = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
 /**
- * The lists in force for a folder. A global list that does not exist yet is
- * seeded from the 0.2 settings rows; a 0.2 repo record is migrated. Both are
- * written back, so every instance reads the same thing.
+ * One stored list: its base record with its rows laid over it (see rows.ts).
+ * A base in the 0.2 shape is migrated and written back. No base: `seed`
+ * becomes it (the global list's first read), else the list does not exist.
  */
+async function readList(store: StorePort, listKey: string, keys: readonly string[], legacy: LegacyOptions, seed?: Policy): Promise<Policy | null> {
+  const raw = await store.get(listKey)
+  let base = raw === undefined || raw === null ? null : parsePolicy(raw)
+  if (base === null && raw !== undefined && raw !== null) {
+    base = migratePolicy(raw, legacy)
+    await store.set(listKey, base)
+  }
+  if (base === null) {
+    if (seed === undefined) return null
+    base = seed
+    await store.set(listKey, base)
+  }
+  const rows = []
+  for (const key of keys.filter(k => isRowOf(listKey, k))) {
+    rows.push([key, await store.get(key)] as const)
+  }
+  return withRows(base, listKey, rows)
+}
+
+/** The global list; seeded from the 0.2 settings rows the first time. */
+const readGlobal = async (store: StorePort, keys: readonly string[], legacy: LegacyOptions): Promise<Policy> =>
+  (await readList(store, GLOBAL_KEY, keys, legacy, migratePolicy(undefined, legacy))) ?? migratePolicy(undefined, legacy)
+
+/** The lists in force for a folder: this repo's own when it has one, else the global one. */
 export async function readLists(store: StorePort, root: string | null, legacy: LegacyOptions): Promise<Lists> {
-  let global = parsePolicy(await store.get(GLOBAL_KEY))
-  if (global === null) {
-    global = migratePolicy(undefined, legacy)
-    await store.set(GLOBAL_KEY, global)
-  }
-  let repo: Policy | null = null
-  const stored = root === null ? undefined : await store.get(repoKeyOf(root))
-  if (root !== null && stored !== undefined && stored !== null) {
-    repo = parsePolicy(stored)
-    if (repo === null) {
-      repo = migratePolicy(stored, legacy)
-      await store.set(repoKeyOf(root), repo)
-    }
-  }
+  const keys = await store.keys()
+  const global = await readGlobal(store, keys, legacy)
+  const repo = root === null ? null : await readList(store, repoKeyOf(root), keys, legacy)
   const catalog = parseCatalog(await store.get(CATALOG_KEY))
   return repo === null ? { policy: global, source: 'global', catalog } : { policy: repo, source: 'repo', catalog }
 }
@@ -61,24 +76,38 @@ export async function readLists(store: StorePort, root: string | null, legacy: L
 /**
  * One change to the list in force, decided from the store, not the session's
  * copy: another process may have changed it, given this repo its own list,
- * or dropped that. Read, changed, written back.
+ * or dropped that. Only the rows it changes are written, so another window's
+ * edit to another row, however close in time, is never overwritten.
+ * `isRefused`: the change answered the same object (it would block the last
+ * allowed model).
  */
 export async function changeActive(
   store: StorePort,
   root: string | null,
   legacy: LegacyOptions,
   change: (policy: Policy) => Policy,
-): Promise<{ policy: Policy; source: Lists['source']; isChanged: boolean }> {
+): Promise<{ policy: Policy; source: Lists['source']; isRefused: boolean }> {
+  const keys = await store.keys()
   const repoKey = root === null ? null : repoKeyOf(root)
-  const repoRaw = repoKey === null ? undefined : await store.get(repoKey)
-  const hasRepo = repoKey !== null && repoRaw !== undefined && repoRaw !== null
-  const stored = hasRepo ? (parsePolicy(repoRaw) ?? migratePolicy(repoRaw, legacy)) : (parsePolicy(await store.get(GLOBAL_KEY)) ?? migratePolicy(undefined, legacy))
+  const repo = repoKey === null ? null : await readList(store, repoKey, keys, legacy)
+  const listKey = repo !== null && repoKey !== null ? repoKey : GLOBAL_KEY
+  const stored = repo ?? (await readGlobal(store, keys, legacy))
   const policy = change(stored)
-  const isChanged = policy !== stored
-  if (isChanged) {
-    await store.set(hasRepo ? repoKey : GLOBAL_KEY, policy)
+  const source = repo === null ? 'global' : 'repo'
+  if (policy === stored) {
+    return { policy, source, isRefused: true }
   }
-  return { policy, source: hasRepo ? 'repo' : 'global', isChanged }
+  for (const [key, value] of changedRows(listKey, stored, policy)) {
+    await store.set(key, value)
+  }
+  return { policy, source, isRefused: false }
+}
+
+/** Removes a list's rows (its base stays): before a repo list is dropped or made again. */
+async function clearRows(store: StorePort, listKey: string): Promise<void> {
+  for (const key of (await store.keys()).filter(k => isRowOf(listKey, k))) {
+    await store.delete(key)
+  }
 }
 
 /** The folder a list is kept for, as the session knows it. */
@@ -95,13 +124,16 @@ export async function switchRepo(store: StorePort, place: ListPlace, to: Lists['
   const key = repoKeyOf(place.repoRoot)
   if (to === 'global') {
     await store.delete(key)
+    await clearRows(store, key)
     return `${name} uses the global list again.`
   }
   const existing = await store.get(key)
   if (existing !== undefined && existing !== null) {
     return `${name} already had its own list (set in another window); it applies here now.`
   }
-  await store.set(key, parsePolicy(await store.get(GLOBAL_KEY)) ?? migratePolicy(undefined, legacy))
+  // Rows left by a list dropped earlier must not ride on the new copy.
+  await clearRows(store, key)
+  await store.set(key, await readGlobal(store, await store.keys(), legacy))
   return `${name} now has its own list, a copy of the global one. /models global goes back.`
 }
 

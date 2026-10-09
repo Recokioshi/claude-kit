@@ -19,8 +19,8 @@
     {
       "name": "model-guard",
       "source": "./mods/model-guard",
-      "description": "Choose the models this session may use: /models toggles Opus, Sonnet, Haiku, Fable and others; subagents and workflows asking for a model that is off are refused (or swapped), requests still on one are swapped to the fallback, and /model to one is refused. Save the choice per repository or as the global default.",
-      "version": "0.2.0",
+      "description": "Choose the model versions Claude and its subagents may use: /models lists the newest of each family from Anthropic's Models API (older versions one key away); block a version, or a family's new ones, and subagents, workflows and /model asking for it are refused or moved to an allowed version. One list shared by every Claude Code window on the machine; a repo can keep its own.",
+      "version": "0.3.0",
       "author": {
         "name": "Adrian Gaik"
       }

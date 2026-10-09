@@ -37,7 +37,7 @@ function letThrough<E, R>($: EngineInterface, e: E, next: (e: E) => R): R {
 
 /** The store as plain functions, for lists.ts. */
 function storeOf($: EngineInterface): StorePort {
-  return { get: key => $.store.get(key), set: (key, value) => $.store.set(key, value), delete: key => $.store.delete(key) }
+  return { get: key => $.store.get(key), set: (key, value) => $.store.set(key, value), delete: key => $.store.delete(key), keys: () => $.store.keys() }
 }
 
 /** A Models API fetch carrying the session's own login; null without one (Bedrock, Vertex, a gateway). */
@@ -83,11 +83,11 @@ async function ensureReady($: EngineInterface, legacy: LegacyOptions, fresh = fa
 }
 
 /** One change to the list in force (this repo's own, else the global one), decided from the store. */
-async function changePolicy($: EngineInterface, legacy: LegacyOptions, change: (policy: Policy, catalog: Catalog) => Policy): Promise<{ isChanged: boolean }> {
+async function changePolicy($: EngineInterface, legacy: LegacyOptions, change: (policy: Policy, catalog: Catalog) => Policy): Promise<{ isRefused: boolean }> {
   const state = await ensureReady($, legacy)
-  const { policy, source, isChanged } = await changeActive(storeOf($), state.repoRoot, legacy, p => change(p, state.catalog))
+  const { policy, source, isRefused } = await changeActive(storeOf($), state.repoRoot, legacy, p => change(p, state.catalog))
   await update($, guard, s => ({ ...s, policy, source }))
-  return { isChanged }
+  return { isRefused }
 }
 
 /** A pane press: its work, with what it has to say (a refusal, a failure) as a toast. */
@@ -98,7 +98,7 @@ function act($: EngineInterface, work: Promise<string | null>): void {
 
 /** A pane change; a refused one (it would block the last allowed model) says why. */
 async function changeFromPane($: EngineInterface, legacy: LegacyOptions, change: (policy: Policy, catalog: Catalog) => Policy, refused = KEEP_ONE): Promise<string | null> {
-  return (await changePolicy($, legacy, change)).isChanged ? null : refused
+  return (await changePolicy($, legacy, change)).isRefused ? refused : null
 }
 
 /** Gives this repo a list of its own (a copy of the stored global one), or drops it. */
@@ -149,7 +149,7 @@ async function runCommand($: EngineInterface, legacy: LegacyOptions, args: strin
   const edit = editOf(command, catalog)
   if (edit !== null) {
     if (!edit.ok) return edit.error
-    return (await changePolicy($, legacy, edit.value.change)).isChanged ? `${edit.value.done}\n${textOf(await read($, guard))}` : KEEP_ONE
+    return (await changePolicy($, legacy, edit.value.change)).isRefused ? KEEP_ONE : `${edit.value.done}\n${textOf(await read($, guard))}`
   }
   switch (command.kind) {
     case 'open':
@@ -278,6 +278,9 @@ export const register: Register = (on, rawOptions) => {
       await showStatus($)
     }
     return yield* next({ ...e, model: swap.model })
+  }).catch(async function* ($, e, next) {
+    $.ui.status(LET_THROUGH)
+    return yield* next(e)
   })
 
   on('tool.call', { tool: 'Workflow' }, async ($, e, next) => {

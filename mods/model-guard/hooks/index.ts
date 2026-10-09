@@ -4,6 +4,7 @@ export * from './commands'
 export * from './decide'
 export * from './lists'
 export * from './policy'
+export * from './rows'
 export * from './state'
 export * from './view'
 

@@ -96,8 +96,10 @@ says so: a broken guard never stops every agent.
 ## Where it is kept
 One JSON file per installed plugin, `~/.claude/plugins/store/model-guard_<marketplace>-<hash>.json`,
 read and written by every Claude Code process on the machine: the global list
-(`policy:global`), each repo's own list (`repo:<path>`) and the model list (`catalog`). It does
-not reach other machines or cloud sessions.
+(`policy:global`), each repo's own list (`repo:<path>`) and the model list (`catalog`). Each
+rule you set is its own entry (`policy:global|version|opus-5`), so edits to different rows from
+two windows, even at the same moment, never overwrite each other. It does not reach other
+machines or cloud sessions.
 
 ## Upgrading from 0.2
 Nothing to do. The first 0.3 session turns your 0.2 choice into the global list: families you

@@ -6,7 +6,7 @@ branch: model-guard-per-version
 gate: cd mods/model-guard && claude plugin test . && claude plugin validate --strict . && npx tsc -p .
 status: active
 started: 2026-10-08T20:19Z
-updated: 2026-10-08T20:56Z
+updated: 2026-10-09T01:12Z
 ---
 
 Goal: Everything in the plan: per-version allow/block, list from the host, machine-wide store, tested; no push/PR.
@@ -28,19 +28,38 @@ Goal: Everything in the plan: per-version allow/block, list from the host, machi
 - [x] A3 policy.ts: rules, alias to id, swap target, migration · f77cf9c — 35 tests; phase review running
 
 ## Phase B · Wiring
-- [ ] B1 State contract, store persistence, migration
-- [ ] B2 Enforcement on version keys
-- [ ] B3 Catalog refresh, seen ids, new-model toast
-- [ ] B4 Text commands
+- [x] B1 State contract, store persistence, migration · 7545e01 — 108 tests; reload + alias tests mutation-checked
+- [x] B2 Enforcement on version keys · 7545e01 — landed with B1 (same commit, see Ruling)
+- [x] B3 Catalog refresh, seen ids, new-model toast · 4cf89c7 — 116 tests; first-fill-silent rule mutation-checked; store/API in lists.ts via ports
+- [x] B4 Text commands · 82e3202 — 128 tests; parsing + decisions pure (commands.ts, decide.ts); tests split by area
 
 ## Phase C · Pane
-- [ ] C1 Two-level list, more, new-versions view
+- [x] C1 Two-level list, more, new-versions view · df3eccf — 132 tests; n view, list status line, u refresh, phone controls
 
 ## Phase D · Release
 - [ ] D1 README, api-notes, version 0.3.0
 - [ ] D2 Manual check in terminal and desktop
 
 ## Log
+- 03:12 Ruling: a turn.start reload racing a pane press can show the old value until the next redraw; the store keeps the press — cost: one s…
+- 03:12 Ruling: register.tsx is 342 lines (all $ glue; logic in 7 pure modules) and turn.start reads 3 store keys — cost if wrong: one oversi…
+- 03:12 Ruling: guard hooks fail open with a status line (as 0.2) — a broken guard must not stop every agent — cost if wrong: a blocked model…
+- 03:12 B/C review fixes e29e183: store-first writes, workflow deny-or-pass, no-login session-only, provider spelling, main model from step; …
+- 23:32 B/C review: 0 BLOCKER, 8 SHOULD-FIX (store-first writes, workflow spawns, no-login, provider spelling, main model, pane errors, input…
+- 23:11 C1 gate evidence: exact gate run in background after the commit, exit 0 — 132 pass, validate ✓, tsc ✓
+- 23:11 C1 done · df3eccf (gate green on the model's word: background run): 132 tests; n view, list status line, u refresh, phone controls
+- 23:09 C1 doing
+- 23:09 Ruling: register.tsx stays ~330 lines — every $ call must live in it (loader); all logic is in pure modules — cost if wrong: one file…
+- 23:09 B4 done · 82e3202: 128 tests; parsing + decisions pure (commands.ts, decide.ts); tests split by area
+- 23:04 B3 done · 4cf89c7: 116 tests; first-fill-silent rule mutation-checked; store/API in lists.ts via ports
+- 23:04 B4 doing
+- 23:00 Ruling: B2 done without a green gate — Same commit as B1, whose gate ran green on this exact code (108 pass, validate ✓, tsc ✓)
+- 23:00 B3 doing
+- 23:00 Ruling: $ can't cross an import (validate refuses) — B3 moves store/API logic to lists.ts behind plain-function ports to keep registe…
+- 23:00 B2 doing
+- 23:00 B1 done · 7545e01: 108 tests; reload + alias tests mutation-checked
+- 22:57 Ruling: B1+B2 land as one commit — the state shape change breaks enforcement, so no green midpoint — cost: a larger review diff
+- 22:57 B1 doing
 - 22:56 Ruling: an alias whose family has no list entries passes to the host even if a version rule blocks one — needs the API list empty — c…
 - 22:56 A review fixes 5853b08: -0 keys, alias rewrite on family block, Vertex/gateway/dotted ids, lenient parsePolicy; 111 tests ✓
 - 22:47 A review round 1: 1 BLOCKER (opus-5-0 ≠ opus-5 key), 6 SHOULD-FIX, 6 NIT — all sent back to impl-a
@@ -52,6 +71,3 @@ Goal: Everything in the plan: per-version allow/block, list from the host, machi
 - 22:24 S1 done · 2b557cb: API ok with bearer (14 models, has `line`); store live across processes; Buttons focusable
 - 22:24 Ruling: no seed.ts (API works); "more" rows are focusable Buttons, no [ ] paging — cost if wrong: one view tweak
 - 22:24 Ruling: spike ran headless (claude -p --plugin-dir), not in desktop+terminal — no hot-reload prompt, 0 cost — desktop↔terminal store …
-- 22:20 S1 doing
-- 22:20 A1 doing
-- 22:19 started on model-guard-per-version

@@ -1,32 +1,42 @@
 {
   "name": "model-guard",
-  "version": "0.2.0",
-  "description": "Choose the models this session may use: /models toggles Opus, Sonnet, Haiku, Fable and others; subagents and workflows asking for a model that is off are refused (or swapped), requests still on one are swapped to the fallback, and /model to one is refused. Save the choice per repository or as the global default.",
-  "author": { "name": "Adrian Gaik" },
+  "version": "0.3.0",
+  "description": "Choose the model versions Claude and its subagents may use: /models lists the newest of each family from Anthropic's Models API (older versions one key away); block a version, or a family's new ones, and subagents, workflows and /model asking for it are refused or moved to an allowed version. One list shared by every Claude Code window on the machine; a repo can keep its own.",
+  "author": {
+    "name": "Adrian Gaik"
+  },
   "types": "./types/index.d.ts",
   "userConfig": {
     "defaultAllowed": {
       "type": "string",
       "title": "Allowed by default",
-      "description": "Comma-separated families allowed when a repo has no saved choice: opus, sonnet, haiku, fable, other. All by default.",
+      "description": "Seeds the global list on the first 0.3 session (the 0.2 setting), and stands in when the saved lists can't be read: comma-separated families allowed (opus, sonnet, haiku, fable, other). Otherwise change things in /models.",
       "required": false,
       "default": "opus,sonnet,haiku,fable,other"
     },
     "fallback": {
       "type": "string",
       "title": "Fallback model",
-      "description": "Where requests on a model that is off go.",
+      "description": "Seeds the global list (and fills a 0.2 repo choice that had none): where requests on a blocked version go when their family has nothing allowed. Otherwise /models (f).",
       "required": false,
       "default": "opus",
-      "options": ["opus", "sonnet", "fable", "haiku"]
+      "options": [
+        "opus",
+        "sonnet",
+        "fable",
+        "haiku"
+      ]
     },
     "mode": {
       "type": "string",
-      "title": "Explicit asks for a model that is off",
-      "description": "deny: refuse the spawn so Claude picks again; swap: run it on the fallback.",
+      "title": "Explicit asks for a blocked version",
+      "description": "Seeds the global list (and fills a 0.2 repo choice that had none). deny: refuse the spawn so Claude picks again; swap: run it on an allowed version. Otherwise /models (m).",
       "required": false,
       "default": "deny",
-      "options": ["deny", "swap"]
+      "options": [
+        "deny",
+        "swap"
+      ]
     }
   }
 }

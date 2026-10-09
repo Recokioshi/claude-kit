@@ -15,7 +15,7 @@ Pick what you need; every piece works on its own.
 | **Mods** | | |
 | `git-gate` | Commits, pushes, PRs, merges and destructive git run only when your message asked for them; everything else is refused before it runs | automatic · `/git-gate` |
 | `progress-pane` | A one-line progress band above the prompt and a `/progress` pane: plan, step details, log, and the questions Claude is waiting on, answerable from the pane while it works | automatic during `/kickoff` · `/progress` |
-| `model-guard` | Choose which models Claude and its subagents may use, per session, per repo or for everything | `/models` |
+| `model-guard` | Choose which model versions Claude and its subagents may use (allow Opus 4.8, block Opus 5), in one list every window on the machine shares, or per repo | `/models` |
 | `handoff` | Writes the state of a task (done, open, decisions, gotchas) for the next repo or session to pick up | `/handoff [to <repo>]` · `/handoff pick` |
 
 **Cost:** the three skills add ≈ 420 tokens to every session (their descriptions) and
@@ -23,8 +23,8 @@ Pick what you need; every piece works on its own.
 and a short contract while a worklog is active.
 
 ## Requirements
-- Claude Code **2.1.287 or newer** (mods need it; check with `claude --version`, update with
-  `claude update`). Mods are an early-access feature: re-run the tests after a Claude Code update.
+- Claude Code **2.1.287 or newer** (mods need it; model-guard 0.3 was tested on 2.1.293; check
+  with `claude --version`, update with `claude update`). Mods are an early-access feature: re-run the tests after a Claude Code update.
 - macOS or Linux, bash (the 3.2 that macOS ships is fine).
 - Windows: use WSL, with Claude Code installed inside it, and clone the kit from the WSL shell
   (e.g. `~/claude-kit`, not a folder under `/mnt/c`). Everything then works in Claude Code sessions
@@ -50,7 +50,7 @@ claude-kit  pick what to install (↑↓ move · space toggle · a all · n none
   Mods
     [x] git-gate       installed   git writes only when you asked (commit, push, PR, merge); no UI
     [x] progress-pane  installed   live worklog band + /progress pane; answer Claude's questions mid-run
-    [ ] model-guard    —           /models: choose which models Claude and its agents may use
+    [ ] model-guard    —           /models: choose which model versions Claude and its agents may use
     [ ] handoff        —           /handoff: carry a task's state to another repo or session
 ```
 It then shows the plan (install, update, remove) and asks before applying it. Afterwards, start
@@ -107,7 +107,7 @@ text there.
 | What | Where |
 |---|---|
 | protected branches, default PR base per repo (`owner/repo=branch`) | `/plugin configure git-gate@claude-kit` |
-| models allowed by default, fallback, deny or swap | `/models` → `g` (global), `s` (this repo) |
+| model versions allowed, new-version defaults, fallback, deny or swap | `/models` (saved at once for every window); `s` gives a repo its own list |
 | a repo's gate command and PR base for `/ship` | `.claude/ship.json` in that repo: `{"gate": "npm test", "prBase": "develop"}` |
 
 Each mod's README has the details: [git-gate](mods/git-gate/README.md) ·

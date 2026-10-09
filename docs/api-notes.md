@@ -37,7 +37,52 @@ in this container.
 - Band (`AbovePrompt`) must size to `e.props.bodyColumns`; return `next(e)` to show nothing.
 - Render hooks never write state; writes happen in handlers via `update($, atom, fn)`.
 
+## Spike results (2026-10-08, Claude Code 2.1.293, `claude -p` + `--plugin-dir`)
+- **Models list through the session's login.** `$.session.authorize()` → `{ kind: 'bearer' }` on a
+  subscription login; `$.http.fetch('https://api.anthropic.com/v1/models?limit=1000', { auth: handle,
+  headers: { 'anthropic-version': '2023-06-01' } })` → 200, no beta header needed, no cost.
+  Body `{ data, has_more, first_id, last_id }`; each entry has `id`, `display_name`, `created_at`,
+  `type: 'model'`, and also `line` (the family, e.g. `"haiku"`), `lifecycle`, `deprecated_at`,
+  `retires_at`, `max_input_tokens`, `capabilities`. 14 models, one page.
+  `authorize()` is null on Bedrock / Vertex / gateways; `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC`
+  refuses a request that carries `auth`.
+- **`$.store` across processes.** One JSON file per installed plugin:
+  `~/.claude/plugins/store/<plugin>_<source>-<hash>.json` (`<source>` is the marketplace, or `inline`
+  for `--plugin-dir` / dev folders, so a dev load has its own store). A running process sees
+  another's write on its next `get`, and keys written by different processes all survive.
+  Same key written by two processes: last write wins.
+- **Pane keyboard.** Buttons are in the pane's focus ring (Tab / arrows / click, Enter presses;
+  `autoFocus`, `$.ui.focus`), so a Button needs no `hotkey` to be reachable.
+- A plugin command run as `claude -p "/<command>"` answers without a model turn (`num_turns: 0`).
+
+## Facts from building model-guard 0.3 (Claude Code 2.1.293)
+- **`$` never crosses an import.** `claude plugin validate` refuses `helper($)` when `helper` is
+  imported ("$ is followed only into a function declared in this same file"). Keep every `$` call
+  in the hooks module and hand other modules plain functions (`{ get: k => $.store.get(k) }`).
+- **Shaped state for hot reload:** `atom(ref, initial, { shape: 'tag' })` with the contract key
+  declared `Shaped<T>` (no import in the contract: it must be self-contained; `Shaped` is in scope
+  inside `declare module 'claude-code'`). A reload whose code names another tag reads the old
+  value as absent.
+- **Guards and `.catch`:** without one, a hook that throws is skipped: the request goes on
+  (fail-open) and the engine reports the failure by name, not in the mod's own words. A `.catch`
+  (an async generator one for `turn.step`) makes the choice explicit; `next` is replay-safe there.
+- **`agent.spawn` for a workflow's agent** (`e.workflow` set): only a `{ deny }` applies; a
+  rewritten `model` is ignored.
+- **`Workflow` input:** `scriptPath` takes precedence over `script` and `name`.
+- **`turn.step`** carries the resolved model id (`e.model`); `$.session.model()` answers as
+  `/model` shows it, which may be an alias or `default`.
+- **The store file** is named from `sha256("<plugin>@<marketplace>")[:12]`, not the version or
+  the folder: every install of one plugin from one marketplace (desktop's cached copy, terminals
+  reading the clone) shares it, and it survives upgrades.
+
 ## Testing facts
 - `claude plugin test <dir>` runs `*.test.ts(x)`; `$.tool.call(...)` raises the plugin's `tool.call` hooks; the test's own `on('tool.call', ...)` stands in for core.
 - `$.ui.mount({ plugin, surface, component, requestId, props })` → `find/findAll/press/drawn`.
 - `claude plugin validate <dir>` lists hooks, `$` calls and state reads/writes per module.
+- A test's `$` has no `store`. `mock.store(on, entries)` answers get/set/delete/keys from memory,
+  but the test gets no handle on it: to read what was written, or to play "another process",
+  stub `store.get/set/delete/keys` with `on(...)` over a `Map`.
+- Test stubs (`on(...)`) must be registered before the test first calls `$`, once per event.
+- A test hook that throws is skipped: the plugin sees "no implementation for <event>", not the
+  thrown message. `$.session.start(...)` fires `session.start`; `clock.advance` / `clock.settle`
+  run `$.clock.after` timers.

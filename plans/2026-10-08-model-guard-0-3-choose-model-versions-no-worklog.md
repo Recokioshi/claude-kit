@@ -4,9 +4,9 @@ title: model-guard 0.3: choose model versions, not families
 plan: docs/plans/model-guard-per-version-models.md
 branch: model-guard-per-version
 gate: cd mods/model-guard && claude plugin test . && claude plugin validate --strict . && npx tsc -p .
-status: active
+status: done
 started: 2026-10-08T20:19Z
-updated: 2026-10-09T01:12Z
+updated: 2026-10-09T01:26Z
 ---
 
 Goal: Everything in the plan: per-version allow/block, list from the host, machine-wide store, tested; no push/PR.
@@ -37,10 +37,22 @@ Goal: Everything in the plan: per-version allow/block, list from the host, machi
 - [x] C1 Two-level list, more, new-versions view · df3eccf — 132 tests; n view, list status line, u refresh, phone controls
 
 ## Phase D · Release
-- [ ] D1 README, api-notes, version 0.3.0
-- [ ] D2 Manual check in terminal and desktop
+- [x] D1 README, api-notes, version 0.3.0 · 74694e6 — review fixes 79a883c (reset explains, turn.step fails open); 163 tests, installer tests 6/6
+- [x] D2 Manual check in terminal and desktop · cb56cc4 — headless real-engine checks ✓; installing 0.3.0 + pane/spawns in desktop/VS Code left for you
+- [x] D3 Edits from two windows at the same moment both survive · cb56cc4 — rules as per-row store keys; 160 tests; 3 real processes × 3 rounds, nothing lost
 
 ## Log
+- 03:26 finished: model-guard 0.3 on model-guard-per-version: per-version rules, list from the Models API, one list for every local window; 1…
+- 03:26 Phase D merged 6bf9bbf; gate on merge ✓ (163 pass, validate ✓, tsc ✓, installer 6/6). Changelog written.
+- 03:25 D1 done · 74694e6 (gate green on the model's word: background run): review fixes 79a883c (reset explains, turn.step fails open); 163 …
+- 03:20 D3 done · cb56cc4 (gate green on the model's word: background run): rules as per-row store keys; 160 tests; 3 real processes × 3 roun…
+- 03:20 Ruling: D2 done without a green gate — A manual check, no code of its own: headless real-engine runs passed (API refresh, cross-proce…
+- 03:19 D2 doing
+- 03:19 D3 doing
+- 03:15 D2 headless (real engine, 0 turns): refresh 14 models ✓, block seen by another process ✓; two processes at once → one block lost: D3 …
+- 03:15 added D3 Edits from two windows at the same moment both survive
+- 03:14 D1 committed; gate ✓ in background (153 pass, validate ✓, tsc ✓, install.sh -n ✓, JSON ✓); docs review running
+- 03:12 D1 doing
 - 03:12 Ruling: a turn.start reload racing a pane press can show the old value until the next redraw; the store keeps the press — cost: one s…
 - 03:12 Ruling: register.tsx is 342 lines (all $ glue; logic in 7 pure modules) and turn.start reads 3 store keys — cost if wrong: one oversi…
 - 03:12 Ruling: guard hooks fail open with a status line (as 0.2) — a broken guard must not stop every agent — cost if wrong: a blocked model…
@@ -60,14 +72,3 @@ Goal: Everything in the plan: per-version allow/block, list from the host, machi
 - 23:00 B1 done · 7545e01: 108 tests; reload + alias tests mutation-checked
 - 22:57 Ruling: B1+B2 land as one commit — the state shape change breaks enforcement, so no green midpoint — cost: a larger review diff
 - 22:57 B1 doing
-- 22:56 Ruling: an alias whose family has no list entries passes to the host even if a version rule blocks one — needs the API list empty — c…
-- 22:56 A review fixes 5853b08: -0 keys, alias rewrite on family block, Vertex/gateway/dotted ids, lenient parsePolicy; 111 tests ✓
-- 22:47 A review round 1: 1 BLOCKER (opus-5-0 ≠ opus-5 key), 6 SHOULD-FIX, 6 NIT — all sent back to impl-a
-- 22:37 A3 done · f77cf9c: 35 tests; phase review running
-- 22:37 A2 done · e5b3b5a: 24 tests; API `line` sets the family of unparsable ids
-- 22:37 A3 doing
-- 22:37 A2 doing
-- 22:37 A1 done · 2645e3b: 14 tests; gate green on mg-a (92 pass)
-- 22:24 S1 done · 2b557cb: API ok with bearer (14 models, has `line`); store live across processes; Buttons focusable
-- 22:24 Ruling: no seed.ts (API works); "more" rows are focusable Buttons, no [ ] paging — cost if wrong: one view tweak
-- 22:24 Ruling: spike ran headless (claude -p --plugin-dir), not in desktop+terminal — no hot-reload prompt, 0 cost — desktop↔terminal store …

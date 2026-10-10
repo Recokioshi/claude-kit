@@ -3,6 +3,9 @@ import { describe, expect, test } from 'claude-code/testing'
 import Hooks from '../hooks'
 import type { Drift, Facts, OpContext, ViewData, Worklog } from '../hooks'
 
+/** A running agent row with no figures yet. */
+const agentRow = (id: string, description: string, step: string | null) => Hooks.newAgent([], { id, description, step, subagentType: 'general-purpose', model: 'claude-opus-5-5', at: 0 })
+
 export const SAMPLE = `---
 worklog: 1
 title: Team billing
@@ -295,7 +298,7 @@ describe('drift', () => {
     expect(d.find(x => x.rule === 'D3')?.step).toBe('A2')
   })
   test('a finished agent whose step is still doing', () => {
-    const d = Hooks.driftOf(parsed(), facts({ agents: [{ id: 'x', description: 'A3 impl', step: 'A3', model: 'claude-opus-5-5', startedAt: 0, endedAt: NOW - 6 * 60_000, status: 'done', tools: 9 }] }), {}, NOW)
+    const d = Hooks.driftOf(parsed(), facts({ agents: [{ ...agentRow('x', 'A3 impl', 'A3'), endedAt: NOW - 6 * 60_000, status: 'done', tools: 9 }] }), {}, NOW)
     expect(d.find(x => x.rule === 'D4')?.text).toContain('A3: its agent finished 6m ago')
   })
   test('each rule is told to Claude at most every 10 minutes; a red gate never (it sees it)', () => {
@@ -309,13 +312,14 @@ describe('band layout', () => {
   const data = () => ({
     doc: parsed(),
     path: 'plans/x-worklog.md',
-    facts: { ...Hooks.EMPTY_FACTS, gates: [{ at: 0, ok: true, command: 'npm run dod', durationMs: 52_000 }], commits: [{ at: 0, sha: '9e1d0aa', subject: 'x', stepAt: 'A2' }], agents: [{ id: 'a', description: 'A3 impl', step: 'A3', model: 'claude-opus-5-5', startedAt: 0, status: 'running' as const, tools: 3 }] },
+    facts: { ...Hooks.EMPTY_FACTS, gates: [{ at: 0, ok: true, command: 'npm run dod', durationMs: 52_000 }], commits: [{ at: 0, sha: '9e1d0aa', subject: 'x', stepAt: 'A2' }], agents: [{ ...agentRow('a', 'A3 impl', 'A3'), tools: 3 }] },
     drift: [],
     now: 4 * 60_000,
     startedMs: 0,
     startedAt: {},
     doneAt: {},
     answered: [],
+    tones: Hooks.DEFAULT_TONES,
   })
   const text = (cols: number) => {
     const { left, right } = Hooks.bandSegments(data(), cols)
@@ -323,7 +327,7 @@ describe('band layout', () => {
   }
   test('wide: everything, attention pinned right', () => {
     const t = text(140)
-    expect(t.left).toContain('2/6 ━━━')
+    expect(t.left).toContain('2/6 ■■■')
     expect(t.left).toContain('A3 Seat count follows team membership')
     expect(t.left).toContain('1 agent')
     expect(t.left).toContain('gate ✓ 4m')
@@ -332,7 +336,7 @@ describe('band layout', () => {
   })
   test('narrow: the bar and git go first, counters and the step stay', () => {
     const t = text(60)
-    expect(t.left).not.toContain('━')
+    expect(t.left).not.toContain('■')
     expect(t.left).not.toContain('9e1d0aa')
     expect(t.left).toContain('2/6')
     expect(t.left).toContain('A3')
@@ -349,7 +353,7 @@ describe('band layout', () => {
   test('drift alone is "~ n", not "!": nothing is waiting on the person', () => {
     const quiet = { ...data(), doc: { ...parsed(), attention: [] }, drift: drift('D1', 'D2', 'D3') }
     expect(right(quiet)).toBe('~ 3')
-    expect(Hooks.healthOf(quiet).glyph).toBe('▶')
+    expect(Hooks.healthOf(quiet)).toEqual({ glyph: '✎', tone: Hooks.DEFAULT_TONES.ink })
   })
   test('decisions, blockers and drift each keep their own glyph', () => {
     expect(right({ ...data(), drift: drift('D1', 'D4') })).toBe('? 1  ! 1  ~ 2')
@@ -366,10 +370,10 @@ describe('band layout', () => {
     expect(left.map(s => s.text).join('').length + r.map(s => s.text).join('').length).toBeLessThanOrEqual(40)
   })
   test('the PLAN rule clips its phase chips so the row never passes the width', () => {
-    const chips = Array.from({ length: 12 }, (_, i) => `○${'ABCDEFGHIJKL'[i]}`).join(' ')
+    const chips = Array.from({ length: 12 }, (_, i) => `□${'ABCDEFGHIJKL'[i]}`).join(' ')
     for (const cols of [20, 30, 47, 80]) {
       const { line, tail } = Hooks.ruleParts('PLAN', cols, chips)
-      expect('PLAN '.length + line.length + (tail ? 1 + tail.length : 0)).toBeLessThanOrEqual(cols)
+      expect('PLAN '.length + line.length + (tail ? 2 + tail.length : 0)).toBeLessThanOrEqual(cols)
     }
     expect(Hooks.ruleParts('PLAN', 80, chips).tail).toBe(chips)
   })
@@ -401,7 +405,7 @@ describe('questions with their context', () => {
 
 describe('elapsed time', () => {
   const at = (iso: string) => Date.parse(iso)
-  const base = () => ({ path: 'p', facts: Hooks.EMPTY_FACTS, drift: [], startedAt: {}, doneAt: {}, answered: [] })
+  const base = () => ({ path: 'p', facts: Hooks.EMPTY_FACTS, drift: [], startedAt: {}, doneAt: {}, answered: [], tones: Hooks.DEFAULT_TONES })
   test('a running task counts to now; a finished one stops at its last update, not when it is opened again', () => {
     const doc = parsed()
     const started = at('2026-09-28T14:11Z')
@@ -411,5 +415,151 @@ describe('elapsed time', () => {
     expect(Hooks.elapsedOf({ ...base(), doc: finished, startedMs: started, now: started + 6 * 60 * 60_000 })).toBe('took 2h')
     const paused = { ...doc, meta: { ...doc.meta, status: 'paused' as const, updated: '2026-09-28T15:41Z' } }
     expect(Hooks.elapsedOf({ ...base(), doc: paused, startedMs: started, now: started + 9 * 60 * 60_000 })).toBe('took 1h30m')
+  })
+})
+
+const MIN = 60_000
+/** The Notebook gallery's sample run: 7 of 18 done, B3 doing, D1 blocks B4, one commit not linked. */
+export const NOTEBOOK_WL = `---
+worklog: 1
+title: Add team billing
+branch: claude/team-billing
+gate: npm run dod
+status: active
+started: 2026-09-28T14:11Z
+updated: 2026-09-28T16:40Z
+---
+
+## Attention
+- [?] D1 Bill per seat or per workspace? — options: per seat / per workspace
+  blocks: B4
+
+## Phase A · API
+- [x] A1 Schema · 1111111
+- [x] A2 Migrate · 2222222
+- [x] A3 Seat count · 3333333
+- [x] A4 Billing flag · 4444444
+- [x] A5 Webhooks · 5555555
+
+## Phase B · UI
+- [x] B1 Hide billing tab · 3f2a1bc
+- [x] B2 Plan picker · 9e1d0aa
+- [~] B3 Seat limit checks
+- [ ] B4 Upgrade prompt copy
+- [ ] B5 Invoice history list
+- [ ] B6 Empty states
+
+## Phase C · Docs
+- [ ] C1 One
+- [ ] C2 Two
+- [ ] C3 Three
+- [ ] C4 Four
+- [ ] C5 Five
+- [ ] C6 Six
+- [ ] C7 Seven
+
+## Log
+- 16:40 B2 done: plan picker; dod ✓
+- 16:05 Ruling: per-seat prices cached for a day — reversible — cost if wrong: one stale invoice
+`
+
+export function notebookData(over: Partial<ViewData> = {}): ViewData {
+  const r = Hooks.parseWorklog(NOTEBOOK_WL)
+  if (!r.doc) throw new Error('notebook sample did not parse')
+  const now = 10 * 60 * MIN
+  const running = (id: string, step: string, model: string, ago: number, costUsd: number, lastTool?: string) =>
+    ({ ...Hooks.newAgent([], { id, description: `${step} work`, step, subagentType: 'general-purpose', model, at: now - ago * MIN }), costUsd, ...(lastTool ? { lastTool } : {}) })
+  return {
+    doc: r.doc,
+    path: 'plans/x-worklog.md',
+    facts: {
+      ...Hooks.EMPTY_FACTS,
+      gates: [{ at: now - 4 * MIN, ok: true, command: 'npm run dod', durationMs: 52_000 }],
+      commits: [10, 9, 8, 7, 6, 2].map((m, i) => ({ at: now - m * MIN, sha: i === 5 ? '9e1d0aa' : `000000${i}`, subject: 'x', stepAt: null })),
+      agents: [running('a1', 'B3', 'claude-opus-5-5', 6, 1, 'Edit src/seats.ts'), running('a2', 'B5', 'claude-sonnet-4-6', 1, 0.32)],
+      context: { percent: 61, cost: 4.1 },
+    },
+    drift: [{ rule: 'D1', text: 'commit 3f2a1bc not linked to a step', at: now - 3 * MIN }],
+    now,
+    startedMs: now - (3 * 60 + 12) * MIN,
+    startedAt: {},
+    doneAt: {},
+    answered: [],
+    tones: { ink: '#8db4f0', highlighter: '#3a3418', pen: '✎' },
+    ...over,
+  }
+}
+
+describe('Notebook band', () => {
+  const line = (d: ViewData, cols: number) => {
+    const { left, right } = Hooks.bandSegments(d, cols)
+    return { left: left.map(s => s.text).join(''), right: right.map(s => s.text).join(''), left_: left }
+  }
+  test('100 columns: every segment, the meter followed by two spaces, then the pen and the step', () => {
+    const b = line(notebookData(), 100)
+    expect(b.left).toBe('! 7/18 ■■■■□□□□□□  ✎ B3 Seat limit checks · 2 agents · gate ✓ 4m · 9e1d0aa 2m · 3h12m')
+    expect(b.right).toBe('? 1  ~ 1')
+    expect(b.left.length + b.right.length + 3).toBeLessThanOrEqual(100)
+  })
+  test('80 columns: elapsed, then the bar go first', () => {
+    expect(line(notebookData(), 80).left).toBe('! 7/18  ✎ B3 Seat limit checks · 2 agents · gate ✓ 4m · 9e1d0aa 2m')
+  })
+  test('60 columns: git and agents go too; the gate stays', () => {
+    const b = line(notebookData(), 60)
+    expect(b.left).toBe('! 7/18  ✎ B3 Seat limit checks · gate ✓ 4m')
+    expect(b.left.length + b.right.length + 3).toBeLessThanOrEqual(60)
+  })
+  test('the count, the meter and the pen are ink; drift is ink bold, not warning; the agents are a separate segment', () => {
+    const { left_, } = line(notebookData(), 100)
+    const seg = (key: string) => left_.find(s => s.key === key)
+    expect(seg('count')).toMatchObject({ tone: '#8db4f0', bold: true })
+    expect(seg('bar')?.tone).toBe('#8db4f0')
+    expect(seg('pen')).toMatchObject({ text: ' ✎ ', tone: '#8db4f0' })
+    expect(seg('agents')).toMatchObject({ text: ' · 2 agents', sep: true })
+    expect(Hooks.bandSegments(notebookData(), 100).right.find(s => s.key === 'd')).toMatchObject({ tone: 'text', bold: true })
+  })
+  test('the pen setting ● covers the band step and the working health glyph', () => {
+    const quiet = notebookData({ tones: { ink: '#2d55c4', highlighter: null, pen: '●' }, drift: [] })
+    const calm = { ...quiet, doc: { ...quiet.doc, attention: [] } }
+    expect(line(calm, 100).left.startsWith('● 7/18 ■■■■□□□□□□  ● B3')).toBe(true)
+  })
+  test('between phases (no current step) the pen is absent and the separators keep one space', () => {
+    const d = notebookData()
+    const idle = { ...d, doc: { ...d.doc, phases: d.doc.phases.map(p => ({ ...p, steps: p.steps.map(s => (s.status === 'done' ? s : { ...s, status: 'blocked' as const })) })) } }
+    expect(line(idle, 100).left).toBe('! 7/18 ■■■■□□□□□□ · 2 agents · gate ✓ 4m · 9e1d0aa 2m · 3h12m')
+  })
+  test('health takes the most severe open item', () => {
+    const d = notebookData()
+    expect(Hooks.healthOf(d)).toEqual({ glyph: '!', tone: 'warning' })
+    expect(Hooks.healthOf({ ...d, doc: { ...d.doc, attention: [...d.doc.attention, { kind: 'blocker', id: 'B3', text: 'key missing' }] } })).toEqual({ glyph: '!', tone: 'error' })
+    expect(Hooks.healthOf({ ...d, drift: [{ rule: 'D6', text: 'gate failed', at: 0 }] })).toEqual({ glyph: '✗', tone: 'error' })
+    const calm = { ...d, doc: { ...d.doc, attention: [] } }
+    expect(Hooks.healthOf(calm)).toEqual({ glyph: '✎', tone: '#8db4f0' })
+    expect(Hooks.healthOf({ ...calm, doc: { ...calm.doc, meta: { ...calm.doc.meta, status: 'done' } } })).toEqual({ glyph: '✓', tone: 'success' })
+  })
+})
+
+describe('Notebook page parts', () => {
+  test('the pane meter is one box per step up to 24, then 20 rounded; 10 on a narrow terminal', () => {
+    expect(Hooks.paneMeterCells(18, 72, true)).toBe(18)
+    expect(Hooks.paneMeterCells(24, 72, true)).toBe(24)
+    expect(Hooks.paneMeterCells(30, 72, true)).toBe(20)
+    expect(Hooks.paneMeterCells(18, 50, true)).toBe(10)
+    expect(Hooks.paneMeterCells(18, 50, false)).toBe(18)
+    expect(Hooks.meter(7, 18, 18)).toEqual({ filled: '■'.repeat(7), empty: '□'.repeat(11) })
+    expect(Hooks.meter(7, 18, 10)).toEqual({ filled: '■'.repeat(4), empty: '□'.repeat(6) })
+  })
+  test('rules are ┄: alone they run to the last cell; with chips the dashes stop 2 cells short and the chips end on the note column', () => {
+    // The mock's 72-cell page: body column from cell 6, so 67 cells.
+    expect(Hooks.ruleParts('NEEDS YOU', 67)).toEqual({ line: '┄'.repeat(57), tail: '' })
+    expect(Hooks.ruleParts('SIGNALS', 67).line).toBe('┄'.repeat(59))
+    expect(Hooks.ruleParts('PLAN', 67, '✓A ▸B □C')).toEqual({ line: '┄'.repeat(51), tail: '✓A ▸B □C' })
+  })
+  test('the Markdown form keeps the shared glyphs', () => {
+    const text = Hooks.textOf({ ...notebookData(), tones: Hooks.DEFAULT_TONES })
+    expect(text).toContain('- ▶ B UI (2/6)')
+    expect(text).toContain('  - ● B3 Seat limit checks')
+    expect(text).toContain('  - ○ B4 Upgrade prompt copy')
+    expect(text).toContain('- ~ commit 3f2a1bc not linked to a step')
   })
 })

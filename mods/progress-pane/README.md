@@ -3,7 +3,7 @@
 Mission control for long autonomous tasks: a worklog you can follow while Claude works, made
 reliable and glanceable from the terminal, desktop or phone.
 
-Tested with Claude Code 2.1.289.
+Tested with Claude Code 2.1.296.
 
 ## Why it can be trusted: three layers
 A UI that only shows what the model *says* is only as good as the model's discipline. This mod
@@ -22,36 +22,51 @@ contract. It stays the same text, so it doesn't break the prompt cache. After `/
 ## What you see
 **Band** (one line above the prompt, only while a worklog is active):
 ```
-! 7/18 ━━━━──────  A3 Seat count follows team membership · 2 agents · gate ✓ 4m · 9e1d0aa 2m · 3h12m    ? 1  ! 1  ~ 1
+! 7/18 ■■■■□□□□□□  ✎ B3 Seat limit checks · 2 agents · gate ✓ 4m · 9e1d0aa 2m · 3h12m       ? 1  ~ 1
 ```
-- The first glyph is the run's health: `▶` working, `!` needs you, `✗` gate red, `✓` finished.
+- The first glyph is the run's health: `✎` working, `!` needs you (yellow for a question, red for a
+  blocker), `✗` gate red, `✓` finished. `✎` also marks the current step.
 - The time at the end is how long the run has been going (from the worklog's `started`). Once
   it is finished or paused it stops at the last update and reads `took 2h05m`.
 - **Click the count** (`7/18`) to open the whole plan; **click the step** to open its details;
-  **click `? 1` / `! 1` / `~ 1`** to open what is waiting on you and what was noticed.
+  **click `2 agents`** for the Agents tab; **click `? 1` / `! 1` / `~ 1`** to open what is
+  waiting on you and what was noticed.
   In the terminal, focus the band with ctrl+x tab, then Enter.
 - Decisions (`?`), blockers (`!`) and drift the mod noticed (`~`) are pinned at the right. Drift
   alone never shows `!`: nothing is waiting on you until Claude asks.
 - As the terminal narrows, segments drop: bar → git → agents → gate. The step title is
   truncated, never dropped.
 
-**Pane** (`/progress`; docked beside the transcript or inline):
+**Pane** (`/progress`; docked beside the transcript or inline), in the Notebook look: a margin
+for status glyphs, a ruled line, the body, and notes that end on the same column; one ruled
+blank row between sections; the line the pen is on carries a highlighter.
 ```
- ! Add team billing                         3h12m
- claude/team-billing…          ━━━━━──────  7/18
- ! NEEDS YOU ────────────────────────────────
-  ? D1 Bill per seat or per workspace?
-  ~ 3m  commit 3f2a1bc not linked to a step
- PLAN ─────────────────────────────── ✓A ▶B ○C
-  ▶ B UI                                    2/6
-   ✓ B1 Hide billing tab                3f2a1bc
-   ● B3 Seat limit checks          opus 6m Edit
-   ○ B4 Upgrade prompt copy
- SIGNALS ────────────────────────────────────
- gate ✓ 4m · 52s   git 9e1d0aa 2m · 6 today
- ctx 61% · $4.10
- 1: [Overview]  2: Plan  3: Log  o: File  x: Close
+ ! │ Add team billing                                             3h12m
+   │ claude/team-billing                       ■■■■■■■□□□□□□□□□□□  7/18
+   │
+   │ NEEDS YOU ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+ ? │ D1 Bill per seat or per workspace?                       blocks B4
+ ~ │ commit 3f2a1bc not linked to a step                             3m
+   │
+   │ PLAN ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  ✓A ▸B □C
+ ▸ │ B UI                                                           2/6
+ ✓ │ B1 Hide billing tab                                        3f2a1bc
+ ✓ │ B2 Plan picker                                             9e1d0aa
+ ✎ │ B3 Seat limit checks                                opus 6m · Edit
+ □ │ B4 Upgrade prompt copy                                        ? D1
+ □ │ B5 Invoice history list                                  sonnet 1m
+ □ │ B6 Empty states
+   │
+   │ SIGNALS ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
+   │ gate    ✓ passed 4m ago · took 52s
+   │ git     claude/team-billing · 9e1d0aa 2m ago · 6 today
+   │ ctx     61% · session $4.10 · agents ≈$1.32
+   │
+   │ 1: Overview 2: Plan 3: Log 4: Agents n: Needs 2 o: File x: Close
 ```
+- The meter is the checklist: one box per step (up to 24; 20 boxes above that).
+- The footer's tabs keep two cells apart when they fit; on a narrow pane the gaps close to one
+  and `Needs you` reads `Needs`.
 - Finished phases fold into the chip strip.
 - With nothing asked, the top section reads `~ NOTICED` instead of `! NEEDS YOU`.
 - Agents fold into their step's row: a step is linked when the agent's description starts with
@@ -73,6 +88,35 @@ contract. It stays the same text, so it doesn't break the prompt cache. After `/
   rules would wrap).
 - It is the same on the phone.
 
+**Agents** (`4` in the pane, `/progress agents`, or click `2 agents` on the band): every subagent
+of the session, running first, each with its own companion.
+```
+ AGENTS ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  2 · 1 running
+ ≈$1.32 at API prices · 412k tokens · 14m
+
+ ✎ │ [owl]  B3 Seat limit checks                           6m
+   │        Opus 5.5 · xhigh
+   │        ■■■□□ 3/5 wiring the guard
+   │        120k tokens · ≈$0.42 · 18 tools
+   │        Edit seat-limits.ts
+```
+- **The companion** is a small pixel creature: the model family picks the creature, the effort
+  its accessory, and the agent's state its pose (working, resting while it waits on a long call,
+  done, failed). On the terminal it is drawn in true color with half-block cells and moves two
+  frames a second while the Agents tab is open; elsewhere it is an SVG.
+- **Progress** is the agent's own: a subagent reports its plan and each finished step with the
+  worklog tool's op `progress` (the `/kickoff` brief asks for it). An agent that reports
+  nothing shows its context fill in pencil instead.
+- **Figures** per agent: model and effort as sent on its last request, tokens, context fill,
+  estimated cost, tool calls, how long it ran, and `round 2` when an agent with the same
+  description ran before (a retry, a second review). The summary line adds them up.
+- **Press an agent** for its page: who it is, its progress and figures, and its log (each tool
+  call it made and each note it reported, newest first). `k`/`j` previous/next, `b` back.
+- **Cost** is an estimate at Anthropic's API list prices from the token counts the engine
+  reports (`hooks/cost.ts`, from the model table of 2026-10-06), not a bill: a subscription pays
+  nothing per token. SIGNALS shows the engine's own session figure and the agents' estimate as
+  two numbers, never added, since the session figure may already include the agents.
+
 **VS Code**: the band above the prompt is drawn only in the terminal and the desktop app; in VS Code
 open the pane with `/progress`.
 
@@ -80,13 +124,15 @@ open the pane with `/progress`.
 nothing draws.
 
 ## Commands
-- `/progress`: open the pane. `/progress plan`: the whole plan. `/progress B6`: that step's details.
+- `/progress`: open the pane. `/progress plan`: the whole plan. `/progress agents`: the crew. `/progress B6`: that step's details.
 - `/progress text`: print the overview.
 - `/progress band off|on`: hide or show the band.
 - `/progress use plans/x-worklog.md`: follow a specific file.
 
 ## The tool (`mcp__progress-pane__worklog`)
-Operations: `start`, `step`, `add`, `attention`, `resolve`, `log`, `finish`, `show`. Every
+Operations: `start`, `step`, `add`, `attention`, `resolve`, `log`, `finish`, `show`, and
+`progress` for subagents (`done`, `total`, `note`: their own steps, shown in the Agents tab and
+never written to the worklog; the lead is refused it and uses `step`). Every
 call answers with one line: `OK A3 → done · 8/18 done · next: A4 Billing gate; A5 …`. Calls are
 applied one at a time, each to the file as it is on disk. `start` with `replace: true` keeps the
 old worklog with `status: paused`. The
@@ -103,3 +149,10 @@ old worklog with `status: paused`. The
   until `pgrep` no longer finds them.
 - The worklog file is the source of truth. The mod re-reads it when it changes on disk
   (polled every 5 s).
+- Notebook's ink blue and highlighter follow the `theme` setting (`/config`): a light theme gets
+  the light pair, any other theme the dark pair. With no theme row, the ink is a mid-tone that
+  reads on both and the doing row is marked by bold and the pen alone.
+- The pen glyph `✎` (U+270E) needs a font with Dingbats. If yours shows a box, set the mod's
+  `Pen glyph` option to `●` in `/config` (or `pluginConfigs.progress-pane.options.pen`).
+- The branch in SIGNALS is the checkout's, read from git (`git branch --show-current`), and read
+  again after a checkout or switch.

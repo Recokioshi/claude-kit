@@ -9,16 +9,32 @@ import type { Worklog } from './worklog'
 /** `ok` null: no result yet (still running, or `background`: the mod never sees one). */
 export type GateRun = { at: number; ok: boolean | null; durationMs?: number; command: string; background?: boolean }
 export type Commit = { at: number; sha: string; subject: string; stepAt: string | null; docsOnly?: boolean }
+/** One line of a subagent's own log: a tool call it made, or a progress note. */
+export type AgentLog = { at: number; text: string; kind: 'tool' | 'note'; isError?: boolean }
+/** What a subagent said about its own progress (worklog op `progress`). */
+export type AgentProgress = { done: number; total?: number; note?: string; at: number }
 export type AgentRow = {
   id: string
   description: string
   step: string | null
+  subagentType?: string
   model: string
+  effort?: string
   startedAt: number
   endedAt?: number
   status: 'running' | 'done' | 'failed'
   tools: number
   lastTool?: string
+  requests: number
+  tokens: number
+  contextTokens: number
+  contextMax: number
+  costUsd: number
+  round: number
+  progress?: AgentProgress
+  log: AgentLog[]
+  /** Set on a failed run: interrupted (Esc, a stop) or an error. */
+  endReason?: 'aborted' | 'error'
 }
 export type Server = { label: string; pattern: string; startedAt: number }
 
@@ -26,6 +42,8 @@ export type Facts = {
   gates: GateRun[]
   commits: Commit[]
   agents: AgentRow[]
+  /** The checkout's branch, from git. */
+  branch?: string
   servers: Server[]
   /** Tool calls on the main loop since the worklog last changed. */
   callsSinceChange: number
@@ -167,6 +185,12 @@ export function driftOf(doc: Worklog | null, facts: Facts, startedAt: Record<str
   if (doing.length > 3) out.push({ rule: 'D5', text: `${doing.length} steps doing at once`, at: now })
   return out
 }
+
+/** "just now", "4m ago": how long since, for a sentence. */
+export const since = (ms: number): string => (ago(ms) === 'now' ? 'just now' : `${ago(ms)} ago`)
+
+/** "under 1m", "4m": a duration, for "took …" and "running …". */
+export const lasted = (ms: number): string => (ago(ms) === 'now' ? 'under 1m' : ago(ms))
 
 /** "now", "4m", "3h12m". */
 export function ago(ms: number): string {

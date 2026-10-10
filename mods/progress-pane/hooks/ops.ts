@@ -10,7 +10,10 @@ import type { Attention, Phase, Step, StepStatus, Worklog } from './worklog'
 export type PhaseInput = { key?: string; title: string; steps: (string | { id?: string; title: string })[] }
 
 export type ToolInput = {
-  op: 'start' | 'step' | 'add' | 'attention' | 'resolve' | 'log' | 'finish' | 'show'
+  op: 'start' | 'step' | 'add' | 'attention' | 'resolve' | 'log' | 'finish' | 'show' | 'progress'
+  // progress (subagents): steps done of total, with `note` as what it is on
+  done?: number
+  total?: number
   // start
   title?: string
   plan?: string
@@ -207,6 +210,10 @@ export function applyOp(current: Worklog | null, input: ToolInput, ctx: OpContex
     case 'show':
       return { ok: true, doc, message: orientation(doc) }
 
+    case 'progress':
+      // A subagent's own progress is a fact the pane shows, never a worklog line.
+      return fail('op progress is for subagents reporting their own work; the lead uses op step')
+
     case 'step': {
       const id = input.id ?? ''
       const status = input.status
@@ -356,7 +363,7 @@ export function applyOp(current: Worklog | null, input: ToolInput, ctx: OpContex
 export const TOOL_SCHEMA = {
   type: 'object',
   properties: {
-    op: { type: 'string', enum: ['start', 'step', 'add', 'attention', 'resolve', 'log', 'finish', 'show'] },
+    op: { type: 'string', enum: ['start', 'step', 'add', 'attention', 'resolve', 'log', 'finish', 'show', 'progress'] },
     title: { type: 'string', description: 'start: the task title (≤80). add: the new step or phase title.' },
     plan: { type: 'string', description: 'start: the plan file path.' },
     branch: { type: 'string', description: 'start: the working/integration branch.' },
@@ -375,7 +382,9 @@ export const TOOL_SCHEMA = {
     replace: { type: 'boolean', description: 'start: replace an active worklog.' },
     id: { type: 'string', description: 'step/attention(blocker)/add: the step id, e.g. A3.' },
     status: { type: 'string', enum: ['todo', 'doing', 'done', 'blocked', 'skipped'] },
-    note: { type: 'string', description: 'step: one short line (≤120).' },
+    note: { type: 'string', description: 'step: one short line (≤120). progress: the step you are on (≤80).' },
+    done: { type: 'integer', minimum: 0, description: 'progress: steps of your own task finished.' },
+    total: { type: 'integer', minimum: 1, description: 'progress: steps in your plan (3-8).' },
     commit: { type: 'string', description: 'step done: the commit sha.' },
     owner: { type: 'string', description: 'step doing: the agent working on it.' },
     force: { type: 'boolean', description: 'step done without a green gate, or finish with open steps or decisions: needs reason.' },
@@ -400,5 +409,5 @@ export const TOOL_DESCRIPTION = [
   'Use it at every step transition of a long task: op "step" with status "doing" when you start a step, "done" with the commit sha when its gate is green, "blocked"/"skipped" with a note.',
   'Ask the user with op "attention" (kind "decision", with why, blocks and recommend so they can answer from the pane) and keep working on what it does not block; their answer reaches you on a later tool result, already resolved in the worklog. Record autonomous choices as op "log" lines starting "Ruling:".',
   'Every call returns progress and the next steps, so after a /compact call op "show" to re-orient.',
-  'Only the lead agent writes the worklog; subagents report back instead.',
+  'Only the lead agent writes the worklog. A subagent reports its own work with op "progress" (total = its plan in 3-8 steps, done = finished, note = the step it is on): right after reading its brief, then as each step ends; the user sees it in the Agents tab.',
 ].join(' ')

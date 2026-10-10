@@ -1,0 +1,61 @@
+{
+  "frames": [
+    {
+      "ms": 2400,
+      "label": "at rest"
+    },
+    {
+      "ms": 500,
+      "label": "B3 breathes",
+      "pane": {
+        "12": " {bold}█{/} {bold}B3 Seat limit checks{/}                                     opus 6m Edit"
+      }
+    },
+    {
+      "ms": 500,
+      "label": "B3 breathes"
+    },
+    {
+      "ms": 500,
+      "label": "B3 breathes",
+      "pane": {
+        "12": " {bold}▒{/} {bold}B3 Seat limit checks{/}                                     opus 6m Edit"
+      }
+    },
+    {
+      "ms": 500,
+      "label": "B3 breathes",
+      "pane": {
+        "12": " {bold}░{/} {bold}B3 Seat limit checks{/}                                     opus 6m Edit"
+      }
+    },
+    {
+      "ms": 500,
+      "label": "B3 breathes",
+      "pane": {
+        "12": " {bold}▒{/} {bold}B3 Seat limit checks{/}                                     opus 6m Edit"
+      }
+    },
+    {
+      "ms": 500,
+      "label": "B3 breathes"
+    },
+    {
+      "ms": 1600,
+      "label": "at rest"
+    },
+    {
+      "ms": 4200,
+      "label": "B3 done",
+      "band100": " {accent}{inverse} ! {/}{/} {bold}8/18{/} ████{dim}░░░░░░{/}  B4 Upgrade prompt copy  {dim}2 agents{/}  {success}gate ✓ 4m{/}  {dim}git c41e7b2 now{/}  {dim}3h12m{/}  {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {accent}{inverse} ! {/}{/} {bold}8/18{/}  B4 Upgrade prompt copy  {success}gate ✓ 4m{/}       {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "2": " {bold}█████████████████████████{/}{dim}░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░░{/}  {bold}8/18{/}",
+        "9": " ▌ {bold}B UI{/}                                                     3/6",
+        "12": " █ {dim}B3 Seat limit checks{/}                                     {dim}c41e7b2{/}",
+        "13": " {bold}▓{/} {bold}B4 Upgrade prompt copy{/}                                   opus 0m Read",
+        "19": "   {dim}git{/}   c41e7b2 now                                        {dim}7 today{/}"
+      }
+    }
+  ]
+}

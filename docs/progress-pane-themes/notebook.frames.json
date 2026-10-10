@@ -1,0 +1,44 @@
+{
+  "frames": [
+    {
+      "ms": 4000,
+      "label": "at rest"
+    },
+    {
+      "ms": 120,
+      "label": "pen lifts",
+      "band100": "{warning}{bold}!{/}{/} {accent}{bold}8/18{/}{/} {accent}■■■■{/}{dim}□□□□□□{/}  {accent}✎{/} B4 Upgrade prompt copy {dim}·{/} {dim}2 agents{/} {dim}·{/} {success}gate ✓ 4m{/} {dim}·{/} {dim}9e1d0aa 2m{/} {dim}·{/} {dim}3h12m{/}     {warning}{bold}? 1{/}{/}  {bold}~ 1{/}",
+      "band60": "{warning}{bold}!{/}{/} {accent}{bold}8/18{/}{/}  {accent}✎{/} B4 Upgrade prompt copy {dim}·{/} {success}gate ✓ 4m{/}        {warning}{bold}? 1{/}{/}  {bold}~ 1{/}",
+      "pane": {
+        "1": "   {accent2}│{/} {dim}claude/team-billing{/}                       {accent}■■■■■■■■{/}{dim}□□□□□□□□□□{/}  {bold}8/18{/}",
+        "8": " {accent}{bold}▸{/}{/} {accent2}│{/} {bold}B UI{/}                                                           {dim}3/6{/}",
+        "11": " {accent}{bold}✎{/}{/} {accent2}│{/} {dim}B3 Seat limit checks{/}                                       {dim}c41e7b2{/}",
+        "12": " {dim}□{/} {accent2}│{/}{bg2} {bold}B4 Upgrade prompt copy{/}                              opus 0m · Read {/}"
+      }
+    },
+    {
+      "ms": 120,
+      "label": "inking",
+      "band100": "{warning}{bold}!{/}{/} {accent}{bold}8/18{/}{/} {accent}■■■■{/}{dim}□□□□□□{/}  {accent}✎{/} B4 Upgrade prompt copy {dim}·{/} {dim}2 agents{/} {dim}·{/} {success}gate ✓ 4m{/} {dim}·{/} {dim}9e1d0aa 2m{/} {dim}·{/} {dim}3h12m{/}     {warning}{bold}? 1{/}{/}  {bold}~ 1{/}",
+      "band60": "{warning}{bold}!{/}{/} {accent}{bold}8/18{/}{/}  {accent}✎{/} B4 Upgrade prompt copy {dim}·{/} {success}gate ✓ 4m{/}        {warning}{bold}? 1{/}{/}  {bold}~ 1{/}",
+      "pane": {
+        "1": "   {accent2}│{/} {dim}claude/team-billing{/}                       {accent}■■■■■■■■{/}{dim}□□□□□□□□□□{/}  {bold}8/18{/}",
+        "8": " {accent}{bold}▸{/}{/} {accent2}│{/} {bold}B UI{/}                                                           {dim}3/6{/}",
+        "11": " {dim}■{/} {accent2}│{/} {dim}B3 Seat limit checks{/}                                       {dim}c41e7b2{/}",
+        "12": " {dim}✎{/} {accent2}│{/}{bg2} {bold}B4 Upgrade prompt copy{/}                              opus 0m · Read {/}"
+      }
+    },
+    {
+      "ms": 3600,
+      "label": "B3 done",
+      "band100": "{warning}{bold}!{/}{/} {accent}{bold}8/18{/}{/} {accent}■■■■{/}{dim}□□□□□□{/}  {accent}✎{/} B4 Upgrade prompt copy {dim}·{/} {dim}2 agents{/} {dim}·{/} {success}gate ✓ 4m{/} {dim}·{/} {dim}9e1d0aa 2m{/} {dim}·{/} {dim}3h12m{/}     {warning}{bold}? 1{/}{/}  {bold}~ 1{/}",
+      "band60": "{warning}{bold}!{/}{/} {accent}{bold}8/18{/}{/}  {accent}✎{/} B4 Upgrade prompt copy {dim}·{/} {success}gate ✓ 4m{/}        {warning}{bold}? 1{/}{/}  {bold}~ 1{/}",
+      "pane": {
+        "1": "   {accent2}│{/} {dim}claude/team-billing{/}                       {accent}■■■■■■■■{/}{dim}□□□□□□□□□□{/}  {bold}8/18{/}",
+        "8": " {accent}{bold}▸{/}{/} {accent2}│{/} {bold}B UI{/}                                                           {dim}3/6{/}",
+        "11": " {success}✓{/} {accent2}│{/} {dim}B3 Seat limit checks{/}                                       {dim}c41e7b2{/}",
+        "12": " {accent}{bold}✎{/}{/} {accent2}│{/}{bg2} {bold}B4 Upgrade prompt copy{/}                              opus 0m · Read {/}"
+      }
+    }
+  ]
+}

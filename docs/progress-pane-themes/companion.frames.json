@@ -1,0 +1,77 @@
+{
+  "frames": [
+    {
+      "ms": 2600,
+      "label": "at rest"
+    },
+    {
+      "ms": 250,
+      "label": "blink",
+      "pane": {
+        "1": " {claude}▐⠠⠄▌{/} {dim}claude/team-billing · npm run dod{/}                        {dim}2 agents{/}"
+      }
+    },
+    {
+      "ms": 2200,
+      "label": "at rest"
+    },
+    {
+      "ms": 1400,
+      "label": "gate running",
+      "band100": " {claude}◉{/} {error}{bold}!{/}{/} {bold}7/18{/} {success}━━━━{/}{dim}──────{/}  B3 Seat limit checks{dim} · 2 agents{/} · gate ● running{dim} · 9e1d0aa 2m{/}        {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks · gate ● running     {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "18": " ● {dim}gate{/} running"
+      }
+    },
+    {
+      "ms": 250,
+      "label": "gate passes",
+      "band100": " {claude}◉{/} {error}{bold}!{/}{/} {bold}7/18{/} {success}━━━━{/}{dim}──────{/}  B3 Seat limit checks{dim} · 2 agents{/}{success} · gate ✓ now{/}{dim} · 9e1d0aa 2m · 3h12m{/}    {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks{success} · gate ✓ now{/}         {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "0": " {claude}▗▄▄▖{/} {error}{bold}!{/}{/} {bold}Add team billing{/}                                          {dim}3h12m{/}",
+        "1": " {claude}▐⠘⠃▌{/} {dim}claude/team-billing · npm run dod{/}                        {dim}2 agents{/}",
+        "18": " {success}✓{/} {dim}gate{/} passed just now                                        {dim}took 49s{/}"
+      }
+    },
+    {
+      "ms": 250,
+      "label": "hops",
+      "band100": " {claude}◉{/} {error}{bold}!{/}{/} {bold}7/18{/} {success}━━━━{/}{dim}──────{/}  B3 Seat limit checks{dim} · 2 agents{/}{success} · gate ✓ now{/}{dim} · 9e1d0aa 2m · 3h12m{/}    {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks{success} · gate ✓ now{/}         {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "1": " {claude}▐⠈⠁▌{/} {dim}claude/team-billing · npm run dod{/}                        {dim}2 agents{/}",
+        "18": " {success}✓{/} {dim}gate{/} passed just now                                        {dim}took 49s{/}"
+      }
+    },
+    {
+      "ms": 2600,
+      "label": "lands, looks down",
+      "band100": " {claude}◉{/} {error}{bold}!{/}{/} {bold}7/18{/} {success}━━━━{/}{dim}──────{/}  B3 Seat limit checks{dim} · 2 agents{/}{success} · gate ✓ now{/}{dim} · 9e1d0aa 2m · 3h12m{/}    {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks{success} · gate ✓ now{/}         {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "18": " {success}✓{/} {dim}gate{/} passed just now                                        {dim}took 49s{/}"
+      }
+    },
+    {
+      "ms": 250,
+      "label": "blink",
+      "band100": " {claude}◉{/} {error}{bold}!{/}{/} {bold}7/18{/} {success}━━━━{/}{dim}──────{/}  B3 Seat limit checks{dim} · 2 agents{/}{success} · gate ✓ now{/}{dim} · 9e1d0aa 2m · 3h12m{/}    {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks{success} · gate ✓ now{/}         {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "1": " {claude}▐⠠⠄▌{/} {dim}claude/team-billing · npm run dod{/}                        {dim}2 agents{/}",
+        "18": " {success}✓{/} {dim}gate{/} passed just now                                        {dim}took 49s{/}"
+      }
+    },
+    {
+      "ms": 1200,
+      "label": "at rest",
+      "band100": " {claude}◉{/} {error}{bold}!{/}{/} {bold}7/18{/} {success}━━━━{/}{dim}──────{/}  B3 Seat limit checks{dim} · 2 agents{/}{success} · gate ✓ now{/}{dim} · 9e1d0aa 2m · 3h12m{/}    {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks{success} · gate ✓ now{/}         {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "18": " {success}✓{/} {dim}gate{/} passed just now                                        {dim}took 49s{/}"
+      }
+    }
+  ]
+}

@@ -14,7 +14,7 @@ Pick what you need; every piece works on its own.
 | `report` | Short, visual status reports: a Slack/Teams message, a one-page meeting summary, a deck outline | `/report [teams\|meeting\|deck\|chat]` |
 | **Mods** | | |
 | `git-gate` | Commits, pushes, PRs, merges and destructive git run only when your message asked for them; everything else is refused before it runs | automatic · `/git-gate` |
-| `progress-pane` | A one-line progress band above the prompt and a `/progress` pane: plan, step details, log, and the questions Claude is waiting on, answerable from the pane while it works | automatic during `/kickoff` · `/progress` |
+| `progress-pane` | A one-line progress band above the prompt and a `/progress` pane in a Notebook look: plan, step details, log, the questions Claude is waiting on (answerable from the pane while it works), and an Agents tab where each subagent has a pixel companion, its own progress and log | automatic during `/kickoff` · `/progress` |
 | `model-guard` | Choose which model versions Claude and its subagents may use (allow Opus 4.8, block Opus 5), in one list every window on the machine shares, or per repo | `/models` |
 | `handoff` | Writes the state of a task (done, open, decisions, gotchas) for the next repo or session to pick up | `/handoff [to <repo>]` · `/handoff pick` |
 
@@ -49,7 +49,7 @@ claude-kit  pick what to install (↑↓ move · space toggle · a all · n none
 
   Mods
     [x] git-gate       installed   git writes only when you asked (commit, push, PR, merge); no UI
-    [x] progress-pane  installed   live worklog band + /progress pane; answer Claude's questions mid-run
+    [x] progress-pane  installed   live worklog band + /progress pane; agent companions; answers mid-run
     [ ] model-guard    —           /models: choose which model versions Claude and its agents may use
     [ ] handoff        —           /handoff: carry a task's state to another repo or session
 ```

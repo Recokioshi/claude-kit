@@ -1,0 +1,59 @@
+{
+  "tooSimilar": [
+    {
+      "a": "typeset",
+      "b": "blueprint",
+      "why": "Same page grammar: tracked-capital section labels (`P L A N`) set into a thin rule, a two-row masthead with the meter and count on row 2, hairline/dash empties in the meter, right column flush at 71. Blueprint only adds ├ ┤ ticks and a blue ink; read side by side they are one layout in two inks.",
+      "changeKey": "blueprint",
+      "suggestion": "Blueprint's idea is the drawing, not letter-spacing. Drop the tracked caps (Typeset owns them) and make every rule a dimension line with the measurement set inside it: `├────── 7/18 ──────┤` for the meter, `├─ PLAN ──────── ✓A ▶B ○C ─┤` with the label at the left tick in plain bold caps, and a crosshair `┼` (already its animation tip) as the section mark at col 2. The title block then becomes the only thing on screen with corners, which is what a drawing sheet looks like."
+    },
+    {
+      "a": "companion",
+      "b": "typeset",
+      "why": "Near-identical palettes (bg #1b1a19 vs #1c1b19, fg #e6e1da vs #e8e3d9, dim #7f786f vs #7a756c, accent the same #d97757 terracotta) and Companion's pane is the stock kit layout with the creature bolted onto the header, so without the creature the two are indistinguishable warm-paper columns.",
+      "changeKey": "companion",
+      "suggestion": "Companion's idea is the creature, which rightly stays in `claude`. Move the desk under it to a cool neutral so the terracotta thing is the only warm pixel: bg #17191c, fg #dfe3e8, dim #767c85, bg2 #20242a (light: bg #f5f7f9, fg #23272d). Keep the stock glyphs, but let the creature own the header gutter: the three header rows are the only block indented to col 7, everything below returns to col 2."
+    },
+    {
+      "a": "console",
+      "b": "blueprint",
+      "why": "Both are steel-blue-on-navy instrument sheets: dim `│` band separators, uppercase captions, ├ ┤ joins (Console on the frame, Blueprint on the meter and rules), a label set into the rule, success-green meters. Palettes are the same family (#6f9fc8 / #0f1419 vs #2D86BC / #0F2D4F).",
+      "changeKey": "console",
+      "suggestion": "A cockpit is amber or phosphor, never blueprint blue. Accent #e3a650 (light: #8a5a0a), accent2 #c9b58a, bg #0c0e10, the beacon ◉ in the amber; keep the full frame, the fixed MODEL/TIME/TOOL field and the `│` separators, which are Console's and not Blueprint's. The GATE readout stays success green so the one green on the panel is the pass light."
+    },
+    {
+      "a": "garden",
+      "b": "typeset",
+      "why": "Garden's sprout is the same #da7756 terracotta that Typeset uses as its 'one terracotta mark' (and Companion's creature); three of ten themes make the identical hex their single warm accent on a warm-dark ground.",
+      "changeKey": "garden",
+      "suggestion": "A sprout is green in life. Make `⚘` a young-leaf chartreuse (#c5e07a, light #5e7a12) which reads as a different thing from the cooler bloom green of `done`, and let the sun `☼` (health working) be the only warm glyph, in a pale gold (#f2e3a0, light #a07c00) kept visibly lighter than `warning` so the two never read as one tone in the same gutter. The 'one warm thing' then becomes the sun, which is the better metaphor anyway, and terracotta leaves the greenhouse."
+    },
+    {
+      "a": "neon",
+      "b": "brutalist",
+      "why": "Both build the meter from `█` / `░` and both reserve `▓` for 'the live cell' (Neon's magenta tail-light edge, Brutalist's breathing doing-row glyph), so the two signature glyphs collide and the meters are the same block run in different colours.",
+      "changeKey": "neon",
+      "suggestion": "Neon's lamp is a colour, not a glyph: keep the edge cell a plain `█` in accent2 (the breathing magenta already carries it) or draw it as `▐` so the tail-light is a narrower, brighter sliver at the end of the lit road. Brutalist's `░▒▓█` weight scale cannot give up `▓` (it is the scale), so Neon moves."
+    },
+    {
+      "a": "transit",
+      "b": "departure",
+      "why": "Two transport-timetable themes with a station-hall mood, a chip strip of phases, and a `○ ● ✓`-style glyph column beside the title; the shared idea ('a journey with stops, read off a board') is what the person will notice, even though rail vs split-flap differ in form.",
+      "changeKey": "departure",
+      "suggestion": "Departure drops the `○ ● ✓ ▸` glyph column entirely: status lives only in the STATUS flap word and the bg2 row band, and col 1 becomes the flap cell itself (a one-cell Text backgroundColor that is lit for BOARDING/WAITING/DELAYED and unlit otherwise). That removes the shared dot vocabulary, makes it more board-like, and leaves Transit alone with the station glyphs."
+    }
+  ],
+  "ranking": [
+    { "key": "transit", "score": 8.5, "oneLine": "Best answer to the complaint with a point of view: the rail turns the gutter into meaning, the badge and bg2 row make the current step unmissable, the band meter's train semantics are the most thought-through in the set, everything is Box/Text with an Svg/flex fallback stated; only soft spots are the coarse 10-cell meter (16/18 = 17/18) and `●` for done losing the universal tick." },
+    { "key": "typeset", "score": 8.3, "oneLine": "The most rigorous spacing spec (explicit column grid, label-collapse rule, empty/finished states, hairline-as-meter), highest restraint and trivially feasible (no Client, no hex on semantics); loses to Transit only on character, since 'stillness is the character' is a defensible answer to 'it's dull' but not the one the owner asked for." },
+    { "key": "notebook", "score": 8.0, "oneLine": "Margin line and margin glyphs give a real gutter and a right column flush at 71, the box-per-step meter is the cleverest single idea here and the highlighter row is quiet character; docked for health `!` in warning (a semantic drift from today's error), the undetectable `✎` tofu risk (a toggle is a workaround, not a fix), and the ink-in animation routing the entire margin column through one 5-wide Client, which is specified cleanly but makes every gutter glyph terminal-only drawing." },
+    { "key": "departure", "score": 7.6, "oneLine": "A true table (STEP/TITLE/STATUS/AGENT/TIME with 2-cell gaps) is the strongest structural fix in the set and the uppercase-only-for-its-own-vocabulary rule is careful; the STATUS word costs 10 cells per row and the five-column grid wants 70 content cells, with only TITLE flexGrow and a phone-only AGENT drop (under 40 cells) stated for narrower panes, and the 8x1 Client flip, though properly specified, is the busiest animation in the set when several rows change at once." },
+    { "key": "console", "score": 7.2, "oneLine": "Fixed seats for every number (15-cell MODEL/TIME/TOOL field, 5-cell id column) answer the spacing complaint precisely and the beacon is tasteful; but the hand-built frame spends 4 columns and a row per divider, every row becomes `│`+content+`│` Text plumbing, the desktop fallback (a bordered Box per section) is a different design, and the look sits on the same steel blue as Blueprint." },
+    { "key": "companion", "score": 7.0, "oneLine": "The most character and the closest to what the owner pointed at (a creature that blinks, looks down at NEEDS YOU, hops on a gate pass) with a cheap 4x3 Client and a stated `full|face|off` fallback; but the spacing fix is just blank lines on the stock layout, the warm palette is Typeset's, and a second pet beside Claude's own may read as derivative rather than as this tool's own voice." },
+    { "key": "brutalist", "score": 6.8, "oneLine": "Hard slabs, a 3-cell gutter and a hard left edge at col 60 do fix the alignment, the yellow-only-when-it's-your-turn rule is good restraint and the inverse/bg approach works on both themes; but `░▒▓█` as step status is hard to tell apart at a glance (done vs doing differ by one shade), the inverse title slab shouts a hundred times a day, and the breathing block is the same move four other themes make." },
+    { "key": "blueprint", "score": 6.7, "oneLine": "Clean dimension-line rules, ✓ tick in the band meter and a title block for SIGNALS are a coherent sheet, feasibility is honest (paper is the terminal's own, ink chosen for 3:1 on four papers, accent2 white is really `text` bold); it ranks here because its tracked caps and two-row masthead duplicate Typeset's and its blue duplicates Console's, so it has the least that is only its own." },
+    { "key": "neon", "score": 6.3, "oneLine": "The tail-light edge and the road-being-revealed animation are a genuinely good single idea and the 70-cell Raster with Svg fallback is specified properly; but a three-row header with a full-width glowing gradient is the least 'still a tool' of the set, #22e3ff/#ff3fd6 need a wholly different light palette (supplied, but the theme stops being night at that point), and the `█░▓` meter collides with Brutalist." },
+    { "key": "garden", "score": 6.0, "oneLine": "Grid and right column are stated cleanly and the sway via two 1x1 Clients is cheap; but a meter of `✿✿✿✿▁▁▁` and three dingbats outside common mono fonts (⚘ ✿ ❀, with a fallback map but no reliable detection) tip from character into cute, the `·` seed is too faint for a todo glyph, and the terracotta sprout borrows Typeset's accent for no botanical reason." }
+  ],
+  "notes": "Set-level gaps. (1) Palettes crowd: five blue-ish accents (console, notebook, transit, blueprint, neon), three terracotta (typeset, companion, garden), two amber/yellow (departure, brutalist); after the suggested moves Console's amber lands near Departure's, so Departure should consider true Solari off-white flaps (#efe6cf) with colour only on semantics. (2) Every theme treats the pane as a read-only page: none shows how a pressable row (count, step, `? n`, phase header, tab) looks when hovered or focused, which is the one thing the engine gives for free and the only way the person learns the pane is clickable. (3) Nobody designs the two-column layout at >= 100 columns inline, which is where a docked pane actually lives. (4) Five of ten animations are the same 'a cell breathes while an agent runs' move (transit, brutalist, garden, neon, console); the owner cited event antics (the creature, the ultracode slider). Only Companion and Notebook have motion tied to events the person cares about, and no theme treats 'finished' as a moment (a one-shot, then rest). (5) Desktop is the degraded case everywhere: the owner sees Claude's creature in the desktop app, yet every proposal reserves its character for the terminal and gives desktop a static Svg at best; a theme designed desktop-first (Svg isInteractive, a real Image in kitty/Ghostty) is missing from the lane list. (6) All ten keep the same section order and the same information; a time-axis lane (log-first, a per-hour strip like Neon's sparkline promoted to the structure) would have widened the set. (7) Every mock measures inside budget (band100 <= 100, band60 <= 60, pane <= 72 x 26) and every theme supplies a light palette, a desktop fallback and a feasibility note, so no proposal fails a hard constraint; the critic's remaining work is glyph coverage (✎ ⚘ ✿ ❀ ☼) and verifying that Text chips inside a plain Button are honoured, which four themes depend on."
+}

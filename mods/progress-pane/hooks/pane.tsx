@@ -9,7 +9,8 @@ import { agentPage, agentsBlock } from './agents'
 import { allSteps } from './worklog'
 import { frameOf, framed, rule } from './frame'
 import type { Frame } from './frame'
-import { header, looseRows, needsBlock, needsRows, planBlock, sections, signalRows, signalsBlock } from './overview'
+import { header, headerRows, looseRows, needsBlock, needsRows, planBlock, sections, signalRows, signalsBlock } from './overview'
+import { planRecap, summaryBlock } from './summary'
 import { fullPlan, ledger, needsDetail, stepDetail } from './pages'
 import { needsOf } from './text'
 import type { Back, PaneActions, PaneView, ViewData } from './view-types'
@@ -87,12 +88,15 @@ function overview(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions, 
   const { Box } = t
   const top = header(f, data)
   const bottom = [footer(f, data, ui, actions)]
+  const heads = headerRows(data)
+  // A finished run: what it took and used, then the plan as it ended.
+  if (data.doc.meta.status === 'done') return sections(f, [top, needsBlock(f, data, 3, actions), summaryBlock(f, data), planRecap(f, data), bottom])
   if (isInline && width >= TWO_COLUMNS) {
     // The left column keeps the ruled margin; the right one is glyph + space only.
     const half = Math.floor(width / 2) - 1
     const left = frameOf(t, tones, half, mono, true)
     const right = frameOf(t, tones, half, mono, false)
-    const stepRows = Math.max(3, rows - 2 - 1 - 2 - 2 - looseRows(data))
+    const stepRows = Math.max(3, rows - heads - 1 - 2 - 2 - looseRows(data))
     return sections(f, [
       top,
       [
@@ -108,7 +112,7 @@ function overview(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions, 
   const needs = needsRows(data, max)
   // Blank rows survive a short pane; the steps fold into `+N more` instead.
   const blanks = needs > 0 ? 4 : 3
-  const stepRows = Math.max(3, rows - 2 - 1 - blanks - needs - 2 - signalRows(data) - looseRows(data))
+  const stepRows = Math.max(3, rows - heads - 1 - blanks - needs - 2 - signalRows(data) - looseRows(data))
   return sections(f, [top, needsBlock(f, data, max, actions), planBlock(f, data, stepRows, actions), signalsBlock(f, data), bottom])
 }
 

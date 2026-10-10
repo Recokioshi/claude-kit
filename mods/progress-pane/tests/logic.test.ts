@@ -319,7 +319,7 @@ describe('band layout', () => {
     startedAt: {},
     doneAt: {},
     answered: [],
-    tones: Hooks.DEFAULT_TONES,
+    tones: Hooks.DEFAULT_TONES, run: Hooks.emptyRun(null),
   })
   const text = (cols: number) => {
     const { left, right } = Hooks.bandSegments(data(), cols)
@@ -405,7 +405,7 @@ describe('questions with their context', () => {
 
 describe('elapsed time', () => {
   const at = (iso: string) => Date.parse(iso)
-  const base = () => ({ path: 'p', facts: Hooks.EMPTY_FACTS, drift: [], startedAt: {}, doneAt: {}, answered: [], tones: Hooks.DEFAULT_TONES })
+  const base = () => ({ path: 'p', facts: Hooks.EMPTY_FACTS, drift: [], startedAt: {}, doneAt: {}, answered: [], tones: Hooks.DEFAULT_TONES, run: Hooks.emptyRun(null) })
   test('a running task counts to now; a finished one stops at its last update, not when it is opened again', () => {
     const doc = parsed()
     const started = at('2026-09-28T14:11Z')
@@ -486,6 +486,7 @@ export function notebookData(over: Partial<ViewData> = {}): ViewData {
     doneAt: {},
     answered: [],
     tones: { ink: '#8db4f0', highlighter: '#3a3418', pen: '✎' },
+    run: Hooks.emptyRun('plans/x-worklog.md'),
     ...over,
   }
 }
@@ -556,7 +557,7 @@ describe('Notebook page parts', () => {
     expect(Hooks.ruleParts('PLAN', 67, '✓A ▸B □C')).toEqual({ line: '┄'.repeat(51), tail: '✓A ▸B □C' })
   })
   test('the Markdown form keeps the shared glyphs', () => {
-    const text = Hooks.textOf({ ...notebookData(), tones: Hooks.DEFAULT_TONES })
+    const text = Hooks.textOf({ ...notebookData(), tones: Hooks.DEFAULT_TONES, run: Hooks.emptyRun(null) })
     expect(text).toContain('- ▶ B UI (2/6)')
     expect(text).toContain('  - ● B3 Seat limit checks')
     expect(text).toContain('  - ○ B4 Upgrade prompt copy')

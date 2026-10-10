@@ -43,6 +43,7 @@ blank row between sections; the line the pen is on carries a highlighter.
 ```
  ! │ Add team billing                                             3h12m
    │ claude/team-billing                       ■■■■■■■□□□□□□□□□□□  7/18
+   │ Opus 5.5 · xhigh · 1.2M tokens · ≈$3.80 · 1h48m working
    │
    │ NEEDS YOU ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
  ? │ D1 Bill per seat or per workspace?                       blocks B4
@@ -71,6 +72,9 @@ blank row between sections; the line the pen is on carries a highlighter.
 - With nothing asked, the top section reads `~ NOTICED` instead of `! NEEDS YOU`.
 - Agents fold into their step's row: a step is linked when the agent's description starts with
   the step id. An agent with no step shows as drift.
+- Under the branch, the main thread's own figures, worded like a subagent's: the model and effort
+  it last ran with, tokens, estimated cost, and the time it spent working (the sum of its turns;
+  the elapsed time at the top right is wall time).
 - From 100 columns inline, the pane uses two columns.
 - `2` **Plan**: every phase, scrollable. Press a phase to fold or unfold it (the current one
   starts open); press a step to open its details.
@@ -87,6 +91,43 @@ blank row between sections; the line the pen is on carries a highlighter.
 - On desktop and mobile, sections are plain labels (their font is not monospace, so `────`
   rules would wrap).
 - It is the same on the phone.
+
+**A finished run** (the worklog's `status: done`; reopen an old one with `/progress use <path>`)
+replaces NEEDS YOU, PLAN and SIGNALS with a summary card, centered and bordered on the terminal,
+then the plan as it ended:
+```
+      ╭──────────────────────────────────────────────────────────╮
+      │                  ✓ Finished · took 3h12m                 │
+      │                                                          │
+      │ worked   5h42m · main 2h05m + crew 3h37m                  │
+      │ plan     18 steps done · 1 skipped · 3 phases             │
+      │          2 decisions asked · 4 rulings                    │
+      │ crew     7 subagents · 140 tool calls                     │
+      │ cost     ≈$11.60 at API prices                            │
+      │          main ≈$7.08 · crew ≈$4.50                        │
+      │ tokens   in 492k · out 276k                               │
+      │          cache read 7.0M · written 900k                   │
+      │ requests 144 · 140 tool calls on main                     │
+      │ git      14 commits · 3 merges · 2 branches               │
+      │ files    +2 added · 1 edited · −1 removed                 │
+      │ lines    +2,340 −610                                      │
+      │                                                          │
+      │    [frog]   [owl]   [fox]   [songbird]                    │
+      │      ×3      ×2      ×1       ×1                          │
+      ╰──────────────────────────────────────────────────────────╯
+```
+- **Worked** adds up working time: the main thread's turns plus every subagent's runs, so it can
+  be longer than the wall time when agents worked side by side.
+- **The lineup** is the crew as companions, one per creature and accessory, with how many ran.
+- **Git** counts commits and merges since the run's base (HEAD when the worklog started),
+  branches with a commit since it started, and the net diff (files and lines) at the end.
+- **The figures cover what this mod watched**: requests, turns and tool calls while the worklog
+  was active, in sessions where the mod was loaded. They are kept per worklog in the plugin
+  store, so a long run survives restarts and compaction; two windows on one worklog write the
+  same entry, and the last write wins. Costs are estimates at API list prices, never the
+  engine's session figure. Nothing is written into the worklog file. The turn that finishes the
+  worklog is not counted: by its end the worklog is no longer active.
+- A run finished with questions or blockers still open (a forced finish) keeps them above the card.
 
 **Agents** (`4` in the pane, `/progress agents`, or click `2 agents` on the band): every subagent
 of the session, running first, each with its own companion.

@@ -5,7 +5,11 @@
  */
 import type { RenderNode } from 'claude-code'
 
-import { ago, since } from './observe'
+import { fmtCost, fmtTokens } from './cost'
+import { modelName } from './crew'
+import { ago, lasted, since } from './observe'
+import { tokensIn } from './runstats'
+import type { RunStats } from './runstats'
 import type { AgentRow, Facts } from './observe'
 import { counts, currentPhase, phaseState } from './worklog'
 import type { Phase, Step, Worklog } from './worklog'
@@ -15,18 +19,36 @@ import { elapsedOf, healthOf, lastGate, meter, needsOf, paneMeterCells, shortMod
 import type { Needs } from './text'
 import type { PaneActions, ViewData } from './view-types'
 
+/** The main thread's figures, worded as an agent entry's: model and effort, tokens, cost, time worked. */
+export function mainLine(run: RunStats): Part[] | null {
+  const m = run.main
+  if (m.requests === 0) return null
+  const who = [m.model ? modelName(m.model) : '', m.effort ?? ''].filter(Boolean).join(' · ')
+  return [
+    ...(who ? [{ text: `${who} · `, dim: true }] : []),
+    { text: `${fmtTokens(tokensIn(m))} tokens`, dim: true },
+    { text: ` · ≈${fmtCost(m.costUsd)}`, dim: true },
+    ...(m.workingMs > 0 ? [{ text: ` · ${lasted(m.workingMs)} working`, dim: true }] : []),
+  ]
+}
+
+/** Header rows: title, branch with the meter, and the main thread's figures once it made a request. */
+export const headerRows = (data: ViewData): number => (mainLine(data.run) ? 3 : 2)
+
 export function header(f: Frame, data: ViewData): RenderNode[] {
   const { doc } = data
   const { done, total } = counts(doc)
   const health = healthOf(data)
   const bar = meter(done, total, paneMeterCells(total, f.width, f.mono))
   const elapsed = elapsedOf(data)
+  const main = mainLine(data.run)
   return [
     row(f, 'h1', { glyph: health.glyph, color: health.tone, bold: true, body: [{ text: doc.meta.title, bold: true }], ...(elapsed ? { note: [{ text: elapsed, dim: true }] } : {}) }),
     row(f, 'h2', {
       body: [{ text: doc.meta.branch ?? data.path, dim: true }],
       note: [{ text: bar.filled, color: data.tones.ink }, { text: bar.empty, dim: true }, { text: '  ' }, { text: `${done}/${total}`, bold: true }],
     }),
+    ...(main ? [row(f, 'h3', { body: main })] : []),
   ]
 }
 

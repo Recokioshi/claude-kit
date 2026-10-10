@@ -6,5 +6,6 @@ export * from './view-types'
 export * from './crew'
 export * from './cost'
 export * from './companions'
+export * from './runstats'
 
 export * as default from '.'

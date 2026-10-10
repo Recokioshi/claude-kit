@@ -6,7 +6,9 @@
  * The Markdown form keeps the kit's shared glyphs (✓ done · ● doing · ○ todo ·
  * ▶ current), since it is read in cloud sessions with no theme at all.
  */
+import { fmtCost, fmtTokens } from './cost'
 import { ago, isStaleGate, since, lasted } from './observe'
+import { totalOf } from './runstats'
 import type { Facts } from './observe'
 import { allSteps, counts, endedMs, phaseState } from './worklog'
 import type { Attention, Phase, Step, Worklog } from './worklog'
@@ -125,6 +127,13 @@ export function textOf(data: ViewData): string {
       for (const s of p.steps) lines.push(`  - ${TEXT_GLYPH[s.status]} ${s.id} ${s.title}${s.sha ? ` · ${s.sha.slice(0, 7)}` : ''}`)
     }
   }
+  const r = data.run
+  const sum = totalOf(r)
+  if (sum.requests > 0) {
+    lines.push('', '**Run**', `- worked ${lasted(sum.workingMs)} (main ${lasted(r.main.workingMs)} + crew ${lasted(r.agents.workingMs)})${r.agents.count ? ` · ${r.agents.count} subagents` : ''}`)
+    lines.push(`- ≈${fmtCost(sum.costUsd)} at API prices (main ≈${fmtCost(r.main.costUsd)} · crew ≈${fmtCost(r.agents.costUsd)}) · tokens in ${fmtTokens(sum.input)} · out ${fmtTokens(sum.output)} · cache read ${fmtTokens(sum.cacheRead)} · written ${fmtTokens(sum.cacheWrite)}`)
+  }
+  if (r.git) lines.push(`- git: ${r.git.commits} commits · ${r.git.merges} merges · ${r.git.branches} branches · files +${r.git.filesAdded} ~${r.git.filesEdited} −${r.git.filesRemoved} · lines +${r.git.linesAdded} −${r.git.linesRemoved}`)
   const running = facts.agents.filter(a => a.status === 'running')
   if (running.length) lines.push('', '**Agents**', ...running.map(a => `- ● ${a.description} · ${shortModel(a.model)} · ${ago(now - a.startedAt)}`))
   const g = lastGate(facts, now)

@@ -4,6 +4,7 @@
  * Notebook theme's colors as the hooks module resolved them for this session.
  */
 import type { Drift, Facts } from './observe'
+import type { RunStats } from './runstats'
 import type { Worklog } from './worklog'
 
 export type Answer = { id: string; question: string; answer: string; at: number; isDelivered: boolean }
@@ -30,6 +31,8 @@ export type ViewData = {
   /** Answers given in the pane: delivered to Claude, or still on their way. */
   answered: Answer[]
   tones: Tones
+  /** This run's totals across sessions: the main thread, the crew, git once finished. */
+  run: RunStats
 }
 
 export type Tab = 'overview' | 'plan' | 'log' | 'step' | 'needs' | 'agents' | 'agent'

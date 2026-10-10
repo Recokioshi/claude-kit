@@ -66,11 +66,26 @@ export type PpFacts = {
   told: Record<string, number>
 }
 
+/** Token and cost totals over many model requests. */
+export type PpUsageTotals = { requests: number; input: number; output: number; cacheRead: number; cacheWrite: number; costUsd: number; workingMs: number; tools: number }
+/** What git shows for a finished run: commits and merges made, branches touched, the net diff. */
+export type PpGitStats = { at: number; commits: number; merges: number; branches: number; filesAdded: number; filesEdited: number; filesRemoved: number; linesAdded: number; linesRemoved: number }
+/** One run's totals (one worklog), kept across sessions in the plugin store. */
+export type PpRun = {
+  path: string | null
+  /** HEAD when the worklog started: the base of the finished run's diff. */
+  base?: string
+  main: PpUsageTotals & { model?: string; effort?: string; turns: number }
+  agents: PpUsageTotals & { count: number; failed: number; crew: Record<string, number> }
+  git?: PpGitStats | null
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'progress-pane': {
       worklog: WlState
       facts: PpFacts
+      run: PpRun
       inbox: { answered: { id: string; question: string; answer: string; at: number; isDelivered: boolean }[]; isTurnRunning: boolean }
       view: { tab: 'overview' | 'plan' | 'log' | 'step' | 'needs' | 'agents' | 'agent'; step?: string; agent?: string; back?: 'overview' | 'plan' | 'agents'; expanded: Record<string, boolean>; isBandHidden: boolean }
     }

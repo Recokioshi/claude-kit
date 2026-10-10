@@ -1,0 +1,71 @@
+{
+  "frames": [
+    {
+      "ms": 2400,
+      "label": "at rest"
+    },
+    {
+      "ms": 1200,
+      "label": "sprout sways",
+      "pane": {
+        "11": " {#7f9252}{bold}⚘{/}{/} {bold}B3 Seat limit checks{/}                                   {dim}opus 6m  Edit{/}"
+      }
+    },
+    {
+      "ms": 2000,
+      "label": "sways back"
+    },
+    {
+      "ms": 400,
+      "label": "B3 ripens",
+      "band100": " {error}{bold}!{/}{/} {bold}8/18{/}  {success}✿✿✿✿{/}{dim}▁▁▁▁▁▁{/}  {accent}⚘{/} B4 Upgrade prompt copy  {dim}2 agents{/}  {success}gate ✓ 4m{/}  {dim}c41e7b2 now{/}  {dim}3h12m{/}     {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}8/18{/}  {accent}⚘{/} B4 Upgrade prompt copy  {success}gate ✓ 4m{/}       {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}  {dim}npm run dod{/}          {success}✿✿✿✿✿✿✿✿✿{/}{dim}▁▁▁▁▁▁▁▁▁▁▁{/}  {bold}8/18{/}",
+        "8": " {bold}▸ B UI{/}                                                             {dim}3/6{/}",
+        "11": " {accent}✿{/} {dim}B3 Seat limit checks{/}                                         {dim}c41e7b2{/}",
+        "12": " {accent}{bold}⚘{/}{/} {bold}B4 Upgrade prompt copy{/}                                 {dim}opus 0m  Read{/}",
+        "19": "   {dim}git{/}    c41e7b2 just now  {dim}7 today{/}"
+      }
+    },
+    {
+      "ms": 3400,
+      "label": "B3 done",
+      "band100": " {error}{bold}!{/}{/} {bold}8/18{/}  {success}✿✿✿✿{/}{dim}▁▁▁▁▁▁{/}  {accent}⚘{/} B4 Upgrade prompt copy  {dim}2 agents{/}  {success}gate ✓ 4m{/}  {dim}c41e7b2 now{/}  {dim}3h12m{/}     {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}8/18{/}  {accent}⚘{/} B4 Upgrade prompt copy  {success}gate ✓ 4m{/}       {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}  {dim}npm run dod{/}          {success}✿✿✿✿✿✿✿✿✿{/}{dim}▁▁▁▁▁▁▁▁▁▁▁{/}  {bold}8/18{/}",
+        "8": " {bold}▸ B UI{/}                                                             {dim}3/6{/}",
+        "11": " {success}✿{/} {dim}B3 Seat limit checks{/}                                         {dim}c41e7b2{/}",
+        "12": " {accent}{bold}⚘{/}{/} {bold}B4 Upgrade prompt copy{/}                                 {dim}opus 0m  Read{/}",
+        "19": "   {dim}git{/}    c41e7b2 just now  {dim}7 today{/}"
+      }
+    },
+    {
+      "ms": 1200,
+      "label": "B4 sprout sways",
+      "band100": " {error}{bold}!{/}{/} {bold}8/18{/}  {success}✿✿✿✿{/}{dim}▁▁▁▁▁▁{/}  {accent}⚘{/} B4 Upgrade prompt copy  {dim}2 agents{/}  {success}gate ✓ 4m{/}  {dim}c41e7b2 now{/}  {dim}3h12m{/}     {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}8/18{/}  {accent}⚘{/} B4 Upgrade prompt copy  {success}gate ✓ 4m{/}       {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}  {dim}npm run dod{/}          {success}✿✿✿✿✿✿✿✿✿{/}{dim}▁▁▁▁▁▁▁▁▁▁▁{/}  {bold}8/18{/}",
+        "8": " {bold}▸ B UI{/}                                                             {dim}3/6{/}",
+        "11": " {success}✿{/} {dim}B3 Seat limit checks{/}                                         {dim}c41e7b2{/}",
+        "12": " {#7f9252}{bold}⚘{/}{/} {bold}B4 Upgrade prompt copy{/}                                 {dim}opus 0m  Read{/}",
+        "19": "   {dim}git{/}    c41e7b2 just now  {dim}7 today{/}"
+      }
+    },
+    {
+      "ms": 2000,
+      "label": "rests on B4",
+      "band100": " {error}{bold}!{/}{/} {bold}8/18{/}  {success}✿✿✿✿{/}{dim}▁▁▁▁▁▁{/}  {accent}⚘{/} B4 Upgrade prompt copy  {dim}2 agents{/}  {success}gate ✓ 4m{/}  {dim}c41e7b2 now{/}  {dim}3h12m{/}     {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "band60": " {error}{bold}!{/}{/} {bold}8/18{/}  {accent}⚘{/} B4 Upgrade prompt copy  {success}gate ✓ 4m{/}       {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/} ",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}  {dim}npm run dod{/}          {success}✿✿✿✿✿✿✿✿✿{/}{dim}▁▁▁▁▁▁▁▁▁▁▁{/}  {bold}8/18{/}",
+        "8": " {bold}▸ B UI{/}                                                             {dim}3/6{/}",
+        "11": " {success}✿{/} {dim}B3 Seat limit checks{/}                                         {dim}c41e7b2{/}",
+        "12": " {accent}{bold}⚘{/}{/} {bold}B4 Upgrade prompt copy{/}                                 {dim}opus 0m  Read{/}",
+        "19": "   {dim}git{/}    c41e7b2 just now  {dim}7 today{/}"
+      }
+    }
+  ]
+}

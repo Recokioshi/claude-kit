@@ -1,0 +1,89 @@
+{
+  "frames": [
+    {
+      "ms": 2400,
+      "label": "at rest"
+    },
+    {
+      "ms": 1000,
+      "label": "lamp breathes",
+      "pane": {
+        "2": " {accent}██████████████████████████{/}{#e036c2}▐{/}{dim}···········································{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "lamp breathes",
+      "pane": {
+        "2": " {accent}██████████████████████████{/}{#c22ea9}▐{/}{dim}···········································{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "lamp breathes",
+      "pane": {
+        "2": " {accent}██████████████████████████{/}{#e036c2}▐{/}{dim}···········································{/}"
+      }
+    },
+    {
+      "ms": 2000,
+      "label": "at rest"
+    },
+    {
+      "ms": 250,
+      "label": "B3 done",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}███{/}{accent2}▐{/}{dim}······{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆ 2 agents{/} {dim}┆{/} {success}gate ✓ 4m{/} {dim}┆ c41e7b2 now{/} {dim}┆ 3h12m{/}      {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆{/} {success}gate ✓ 4m{/}          {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "pane": {
+        "1": " {dim}claude/team-billing ┆ npm run dod{/}                                 {bold}8/18{/}",
+        "2": " {accent}███████████████████████████{/}{accent2}▐{/}{dim}··········································{/}",
+        "9": "  {accent}{bold}▶{/}{/} {bold}B UI{/}                                                            {dim}3/6{/}",
+        "12": "    {success}✓{/} {dim}B3 Seat limit checks{/}                                      {dim}c41e7b2{/}",
+        "13": " {bg2}   {/}{bg2}{accent2}●{/}{/}{bg2} {/}{bg2}{bold}B4 Upgrade prompt copy{/}{/}{bg2}                               {/}{bg2}opus 0m Read{/}",
+        "19": "  {dim}git{/}    c41e7b2 {dim}now{/}                                   {dim}   ▁ ▁▂▃{/} {dim}7 today{/}"
+      }
+    },
+    {
+      "ms": 250,
+      "label": "lamp drives on",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}███{/}{accent2}▐{/}{dim}······{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆ 2 agents{/} {dim}┆{/} {success}gate ✓ 4m{/} {dim}┆ c41e7b2 now{/} {dim}┆ 3h12m{/}      {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆{/} {success}gate ✓ 4m{/}          {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "pane": {
+        "1": " {dim}claude/team-billing ┆ npm run dod{/}                                 {bold}8/18{/}",
+        "2": " {accent}████████████████████████████{/}{accent2}▐{/}{dim}·········································{/}",
+        "9": "  {accent}{bold}▶{/}{/} {bold}B UI{/}                                                            {dim}3/6{/}",
+        "12": "    {success}✓{/} {dim}B3 Seat limit checks{/}                                      {dim}c41e7b2{/}",
+        "13": " {bg2}   {/}{bg2}{accent2}●{/}{/}{bg2} {/}{bg2}{bold}B4 Upgrade prompt copy{/}{/}{bg2}                               {/}{bg2}opus 0m Read{/}",
+        "19": "  {dim}git{/}    c41e7b2 {dim}now{/}                                   {dim}   ▁ ▁▂▃{/} {dim}7 today{/}"
+      }
+    },
+    {
+      "ms": 250,
+      "label": "lamp drives on",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}███{/}{accent2}▐{/}{dim}······{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆ 2 agents{/} {dim}┆{/} {success}gate ✓ 4m{/} {dim}┆ c41e7b2 now{/} {dim}┆ 3h12m{/}      {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆{/} {success}gate ✓ 4m{/}          {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "pane": {
+        "1": " {dim}claude/team-billing ┆ npm run dod{/}                                 {bold}8/18{/}",
+        "2": " {accent}█████████████████████████████{/}{accent2}▐{/}{dim}········································{/}",
+        "9": "  {accent}{bold}▶{/}{/} {bold}B UI{/}                                                            {dim}3/6{/}",
+        "12": "    {success}✓{/} {dim}B3 Seat limit checks{/}                                      {dim}c41e7b2{/}",
+        "13": " {bg2}   {/}{bg2}{accent2}●{/}{/}{bg2} {/}{bg2}{bold}B4 Upgrade prompt copy{/}{/}{bg2}                               {/}{bg2}opus 0m Read{/}",
+        "19": "  {dim}git{/}    c41e7b2 {dim}now{/}                                   {dim}   ▁ ▁▂▃{/} {dim}7 today{/}"
+      }
+    },
+    {
+      "ms": 3000,
+      "label": "lamp settles",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}███{/}{accent2}▐{/}{dim}······{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆ 2 agents{/} {dim}┆{/} {success}gate ✓ 4m{/} {dim}┆ c41e7b2 now{/} {dim}┆ 3h12m{/}      {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/}  {bold}B4 Upgrade prompt copy{/} {dim}┆{/} {success}gate ✓ 4m{/}          {warning}{bold}? 1{/}{/}  {warning}{bold}~ 1{/}{/}",
+      "pane": {
+        "1": " {dim}claude/team-billing ┆ npm run dod{/}                                 {bold}8/18{/}",
+        "2": " {accent}██████████████████████████████{/}{accent2}▐{/}{dim}·······································{/}",
+        "9": "  {accent}{bold}▶{/}{/} {bold}B UI{/}                                                            {dim}3/6{/}",
+        "12": "    {success}✓{/} {dim}B3 Seat limit checks{/}                                      {dim}c41e7b2{/}",
+        "13": " {bg2}   {/}{bg2}{accent2}●{/}{/}{bg2} {/}{bg2}{bold}B4 Upgrade prompt copy{/}{/}{bg2}                               {/}{bg2}opus 0m Read{/}",
+        "19": "  {dim}git{/}    c41e7b2 {dim}now{/}                                   {dim}   ▁ ▁▂▃{/} {dim}7 today{/}"
+      }
+    }
+  ]
+}

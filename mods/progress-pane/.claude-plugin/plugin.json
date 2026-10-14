@@ -1,6 +1,6 @@
 {
   "name": "progress-pane",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Mission control for long tasks, in a Notebook look: a validated worklog tool Claude updates at every step (done only after a green gate), facts the mod sees for itself (gate runs, commits, branch, agents, context and cost), drift hints where the two disagree, a band above the prompt, a /progress pane, and an Agents tab where every subagent has a pixel companion (the model picks the creature, the effort its accessory) with its own progress, figures and log.",
   "author": {
     "name": "Adrian Gaik"
@@ -12,10 +12,7 @@
       "title": "Pen glyph",
       "description": "The glyph that marks the step in progress. Pick ● if your terminal font shows ✎ as a box.",
       "default": "✎",
-      "options": [
-        "✎",
-        "●"
-      ]
+      "options": ["✎", "●"]
     }
   }
 }

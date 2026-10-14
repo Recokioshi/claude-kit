@@ -484,12 +484,13 @@ describe('the Notebook page, measured against the gallery mock', () => {
       '   │',
       `   │ PLAN ${'┄'.repeat(51)}  ✓A ▸B □C`,
       ' ▸ │ B UI                                                           2/6',
-      ' ✓ │ B1 Hide billing tab                                        3f2a1bc',
-      ' ✓ │ B2 Plan picker                                             9e1d0aa',
-      ' ✎ │ B3 Seat limit checks                                opus 6m · Edit ',
-      ' □ │ B4 Upgrade prompt copy                                        ? D1',
-      ' □ │ B5 Invoice history list                                  sonnet 1m',
-      ' □ │ B6 Empty states',
+      // Steps hang under their phase on a thin ink rail, two cells in.
+      ' ✓ │ ▏ B1 Hide billing tab                                      3f2a1bc',
+      ' ✓ │ ▏ B2 Plan picker                                           9e1d0aa',
+      ' ✎ │ ▏ B3 Seat limit checks                              opus 6m · Edit ',
+      ' □ │ ▏ B4 Upgrade prompt copy                                      ? D1',
+      ' □ │ ▏ B5 Invoice history list                                sonnet 1m',
+      ' □ │ ▏ B6 Empty states',
       '   │',
       `   │ SIGNALS ${'┄'.repeat(59)}`,
       '   │ gate    ✓ passed 4m ago · took 52s',
@@ -517,7 +518,7 @@ describe('the Notebook page, measured against the gallery mock', () => {
   test('with no highlighter (theme unknown): bold and the pen mark the doing row, the footer keeps [brackets]', async ($, on) => {
     const { rows, tree } = await pageRows($, on, notebookData({ tones: Hooks.DEFAULT_TONES }))
     expect(JSON.stringify(tree)).not.toContain('backgroundColor')
-    expect(rows).toContain(' ✎ │ B3 Seat limit checks                                opus 6m · Edit')
+    expect(rows).toContain(' ✎ │ ▏ B3 Seat limit checks                              opus 6m · Edit')
     expect(rows.some(r => r.includes('1: [Overview]'))).toBe(true)
   })
 
@@ -537,7 +538,7 @@ describe('the Notebook page, measured against the gallery mock', () => {
   test('a short pane keeps the four blank rows and folds the steps into "+N more"', async ($, on) => {
     const { rows } = await pageRows($, on, notebookData(), { rows: 12 })
     expect(rows.filter(r => r === '   │')).toHaveLength(4)
-    expect(rows.some(r => /^ {3}│ \+\d+ more$/.test(r))).toBe(true)
+    expect(rows.some(r => /^ {3}│ ▏ \+\d+ more$/.test(r))).toBe(true)
   })
 
   test('with nothing asked or noticed the top section is omitted and the rhythm kept', async ($, on) => {
@@ -552,7 +553,7 @@ describe('the Notebook page, measured against the gallery mock', () => {
   test('below 48 columns the margin line is dropped and step notes collapse to the sha', async ($, on) => {
     const { rows } = await pageRows($, on, notebookData(), { columns: 46 })
     expect(rows.some(r => r.includes('│'))).toBe(false)
-    expect(rows.some(r => r.startsWith(' ✓ B1 Hide billing tab') && r.endsWith('3f2a1bc'))).toBe(true)
+    expect(rows.some(r => r.startsWith(' ✓ ▏ B1 Hide billing tab') && r.endsWith('3f2a1bc'))).toBe(true)
     expect(rows.some(r => r.includes('opus'))).toBe(false)
   })
 
@@ -562,6 +563,8 @@ describe('the Notebook page, measured against the gallery mock', () => {
     expect(json).not.toContain('│')
     expect(json).not.toContain('┄')
     expect(json).toContain('{"type":"Box","props":{"width":3,"justifyContent":"center"}')
+    // Each step row carries a 1-wide ink rail Box before its body.
+    expect(json).toContain('{"type":"Box","props":{"width":1,"flexShrink":0,"backgroundColor":"#8db4f0"}}')
     expect(json).toContain('{"type":"Box","props":{"width":8},"children":[{"type":"Text","props":{"dimColor":true},"children":["gate"]}]}')
     expect(json).toContain('■■■■■■■')
   })

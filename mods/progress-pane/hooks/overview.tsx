@@ -81,6 +81,7 @@ export function stepRow(f: Frame, step: Step, data: ViewData, open?: () => void)
     ...(open ? { press: { key: `open-${step.id}`, onPress: open, ...(settled ? { dim: true } : {}) } } : {}),
     note: stepNote(f, step, data),
     highlight: doing,
+    rail: data.tones.ink,
   })
 }
 
@@ -158,15 +159,16 @@ export function planBlock(f: Frame, data: ViewData, rows: number, actions?: Pane
   out.push(phaseRow(f, data, phase))
   const { start, count } = stepWindow(phase.steps, rows)
   const shown = phase.steps.slice(start, start + count)
-  if (start > 0) out.push(row(f, 's-above', { body: [{ text: `✓ ${start} done above`, dim: true }] }))
+  if (start > 0) out.push(row(f, 's-above', { body: [{ text: `✓ ${start} done above`, dim: true }], rail: data.tones.ink }))
   out.push(...shown.map(s => stepRow(f, s, data, actions ? () => actions.openStep(s.id, 'overview') : undefined)))
   const below = phase.steps.length - start - shown.length
-  if (below > 0) out.push(row(f, 's-below', { body: [{ text: `+${below} more`, dim: true }] }))
+  if (below > 0) out.push(row(f, 's-below', { body: [{ text: `+${below} more`, dim: true }], rail: data.tones.ink }))
   for (const a of looseOf(data)) {
     out.push(row(f, `loose-${a.id}`, {
       glyph: '~', color: 'text', bold: true,
       body: [{ text: `agent “${a.description}” (no step)` }],
       note: [{ text: `${shortModel(a.model)} ${ago(data.now - a.startedAt)}`, dim: true }],
+      rail: data.tones.ink,
     }))
   }
   return out

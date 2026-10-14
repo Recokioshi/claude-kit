@@ -51,12 +51,12 @@ blank row between sections; the line the pen is on carries a highlighter.
    │
    │ PLAN ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  ✓A ▸B □C
  ▸ │ B UI                                                           2/6
- ✓ │ B1 Hide billing tab                                        3f2a1bc
- ✓ │ B2 Plan picker                                             9e1d0aa
- ✎ │ B3 Seat limit checks                                opus 6m · Edit
- □ │ B4 Upgrade prompt copy                                        ? D1
- □ │ B5 Invoice history list                                  sonnet 1m
- □ │ B6 Empty states
+ ✓ │ ▏ B1 Hide billing tab                                      3f2a1bc
+ ✓ │ ▏ B2 Plan picker                                           9e1d0aa
+ ✎ │ ▏ B3 Seat limit checks                              opus 6m · Edit
+ □ │ ▏ B4 Upgrade prompt copy                                      ? D1
+ □ │ ▏ B5 Invoice history list                                sonnet 1m
+ □ │ ▏ B6 Empty states
    │
    │ SIGNALS ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
    │ gate    ✓ passed 4m ago · took 52s
@@ -65,6 +65,8 @@ blank row between sections; the line the pen is on carries a highlighter.
    │
    │ 1: Overview 2: Plan 3: Log 4: Agents n: Needs 2 o: File x: Close
 ```
+- Steps hang under their phase on a thin ink rail, one level in; on desktop and mobile the rail
+  is a colored bar, so a phase and its steps read as one block.
 - The meter is the checklist: one box per step (up to 24; 20 boxes above that).
 - The footer's tabs keep two cells apart when they fit; on a narrow pane the gaps close to one
   and `Needs you` reads `Needs`.

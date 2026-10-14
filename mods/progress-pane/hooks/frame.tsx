@@ -110,7 +110,14 @@ export type RowSpec = Partial<Glyph> & {
   note?: Part[]
   /** The doing row: the highlighter runs under the body to the last cell. */
   highlight?: boolean
+  /** A step under its phase: a thin rail in this color before the body, and the body one level in. */
+  rail?: string
 }
+
+/** Cells a railed row's body gives up: the rail glyph and a space. */
+export const RAIL_CELLS = 2
+/** Left one-eighth block: a thin line down the steps of a phase. */
+const RAIL = '▏'
 
 function partTexts(t: ElementTable, parts: Part[]): RenderNode[] {
   const { Text } = t
@@ -143,6 +150,8 @@ export function row(f: Frame, key: string, spec: RowSpec): RenderNode {
     return (
       <Box key={key} flexDirection="row">
         <Box width={3} justifyContent="center"><Text color={spec.color} dimColor={spec.dim} bold={spec.bold}>{spec.glyph || ' '}</Text></Box>
+        {spec.rail ? <Box width={1} flexShrink={0} backgroundColor={spec.rail} /> : null}
+        {spec.rail ? <Box width={1} flexShrink={0} /> : null}
         <Box flexDirection="row" flexGrow={1} backgroundColor={bg}>
           {spec.label !== undefined ? <Box width={LABEL_CELLS}><Text dimColor>{spec.label}</Text></Box> : null}
           {bodyNode(f, spec, spec.body)}
@@ -154,7 +163,8 @@ export function row(f: Frame, key: string, spec: RowSpec): RenderNode {
   }
   const lead = f.ruled ? 1 : 0
   // The note ends one cell short of the width; the highlighter fills that cell too.
-  const avail = f.width - 1 - marginCells(f)
+  const railLen = spec.rail ? RAIL_CELLS : 0
+  const avail = f.width - 1 - marginCells(f) - railLen
   const labelLen = spec.label !== undefined ? LABEL_CELLS : 0
   let note = spec.note?.length ? spec.note : undefined
   let noteLen = note ? partsLen(note) : 0
@@ -164,8 +174,11 @@ export function row(f: Frame, key: string, spec: RowSpec): RenderNode {
   return (
     <Box key={key} flexDirection="row">
       {margin(f, spec)}
+      {/* The rail sits outside the highlighter, in its own color; without one the lead space is highlighted too. */}
+      {spec.rail && lead ? <Text key="m5"> </Text> : null}
+      {spec.rail ? <Text key="rail" color={spec.rail}>{`${RAIL} `}</Text> : null}
       <Box flexDirection="row" backgroundColor={bg}>
-        {lead ? <Text key="m5"> </Text> : null}
+        {!spec.rail && lead ? <Text key="m5"> </Text> : null}
         {spec.label !== undefined ? <Text key="label" dimColor>{spec.label.padEnd(LABEL_CELLS)}</Text> : null}
         {bodyNode(f, spec, body)}
         {fill > 0 ? <Text key="fill">{' '.repeat(fill)}</Text> : null}

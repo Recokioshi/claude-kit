@@ -17,10 +17,48 @@ export type WlDoc = {
 }
 export type WlState = { path: string | null; doc: WlDoc | null; errors: { line: number; message: string }[]; mtimeMs: number; startedAt: Record<string, number>; doneAt: Record<string, number> }
 
+/** One line of a subagent's own log: a tool call it made, or a progress note. */
+export type PpAgentLog = { at: number; text: string; kind: 'tool' | 'note'; isError?: boolean }
+/** What a subagent said about its own progress (worklog op `progress`). */
+export type PpAgentProgress = { done: number; total?: number; note?: string; at: number }
+export type PpAgent = {
+  id: string
+  description: string
+  /** The worklog step its description starts with, if any. */
+  step: string | null
+  /** The agent type it was spawned as (`general-purpose`, `Explore`, a plugin's). */
+  subagentType?: string
+  model: string
+  /** As the engine sent it on the agent's last model request: low … max, or a number. */
+  effort?: string
+  startedAt: number
+  endedAt?: number
+  status: 'running' | 'done' | 'failed'
+  tools: number
+  lastTool?: string
+  /** Model requests made, and their summed tokens (input, output and cache). */
+  requests: number
+  tokens: number
+  /** The last request's context fill, and the model's window. */
+  contextTokens: number
+  contextMax: number
+  /** Estimated from tokens and a per-model price table; not a bill. */
+  costUsd: number
+  /** 1 for a first run; n when n agents had this description. */
+  round: number
+  progress?: PpAgentProgress
+  /** Newest last, capped. */
+  log: PpAgentLog[]
+  /** Set on a failed run: interrupted (Esc, a stop) or an error. */
+  endReason?: 'aborted' | 'error'
+}
+
 export type PpFacts = {
   gates: { at: number; ok: boolean | null; durationMs?: number; command: string; background?: boolean }[]
   commits: { at: number; sha: string; subject: string; stepAt: string | null; docsOnly?: boolean }[]
-  agents: { id: string; description: string; step: string | null; model: string; startedAt: number; endedAt?: number; status: 'running' | 'done' | 'failed'; tools: number; lastTool?: string }[]
+  agents: PpAgent[]
+  /** The checkout's branch, from git (the worklog's `branch` is what was planned). */
+  branch?: string
   servers: { label: string; pattern: string; startedAt: number }[]
   callsSinceChange: number
   worklogChangedAt: number
@@ -28,13 +66,28 @@ export type PpFacts = {
   told: Record<string, number>
 }
 
+/** Token and cost totals over many model requests. */
+export type PpUsageTotals = { requests: number; input: number; output: number; cacheRead: number; cacheWrite: number; costUsd: number; workingMs: number; tools: number }
+/** What git shows for a finished run: commits and merges made, branches touched, the net diff. */
+export type PpGitStats = { at: number; commits: number; merges: number; branches: number; filesAdded: number; filesEdited: number; filesRemoved: number; linesAdded: number; linesRemoved: number }
+/** One run's totals (one worklog), kept across sessions in the plugin store. */
+export type PpRun = {
+  path: string | null
+  /** HEAD when the worklog started: the base of the finished run's diff. */
+  base?: string
+  main: PpUsageTotals & { model?: string; effort?: string; turns: number }
+  agents: PpUsageTotals & { count: number; failed: number; crew: Record<string, number> }
+  git?: PpGitStats | null
+}
+
 declare module 'claude-code' {
   interface PluginState {
     'progress-pane': {
       worklog: WlState
       facts: PpFacts
+      run: PpRun
       inbox: { answered: { id: string; question: string; answer: string; at: number; isDelivered: boolean }[]; isTurnRunning: boolean }
-      view: { tab: 'overview' | 'plan' | 'log' | 'step' | 'needs'; step?: string; back?: 'overview' | 'plan'; expanded: Record<string, boolean>; isBandHidden: boolean }
+      view: { tab: 'overview' | 'plan' | 'log' | 'step' | 'needs' | 'agents' | 'agent'; step?: string; agent?: string; back?: 'overview' | 'plan' | 'agents'; expanded: Record<string, boolean>; isBandHidden: boolean }
     }
   }
 }

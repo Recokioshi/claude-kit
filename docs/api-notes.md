@@ -75,6 +75,19 @@ in this container.
   the folder: every install of one plugin from one marketplace (desktop's cached copy, terminals
   reading the clone) shares it, and it survives upgrades.
 
+## Facts from building progress-pane 0.3 (Claude Code 2.1.295 types / 2.1.296 CLI)
+- **One hooks module per plugin** (`hooks.json` `modules` names one path), and `$` is followed
+  only within that file: the wiring stays in it however long it grows; pure logic moves out.
+- **Raster with half blocks** validates and draws: `▀` (U+2580) with the upper pixel as foreground
+  and the lower as background gives two true-color pixels per cell; `▄` when only the lower is
+  set; `0x01000000` for the terminal's own color. `$.ui.blit({ requestId, key, cells, columns,
+  rows })` repaints it in place and answers `{ deny }` once the site is unmounted.
+- `$.config.list()` carries the theme as the row with `key === 'theme'`.
+- `turn.step` carries `effort` (`low`…`max`, or a number) and `agentId` per request, and its
+  result's `usage` the answering model and tokens: enough for per-subagent cost and effort.
+- State written by an earlier version survives a hot reload: rows that gained required fields
+  must be normalized on read (or the atom shaped), or a drawing that reads them throws.
+
 ## Testing facts
 - `claude plugin test <dir>` runs `*.test.ts(x)`; `$.tool.call(...)` raises the plugin's `tool.call` hooks; the test's own `on('tool.call', ...)` stands in for core.
 - `$.ui.mount({ plugin, surface, component, requestId, props })` → `find/findAll/press/drawn`.
@@ -86,3 +99,10 @@ in this container.
 - A test hook that throws is skipped: the plugin sees "no implementation for <event>", not the
   thrown message. `$.session.start(...)` fires `session.start`; `clock.advance` / `clock.settle`
   run `$.clock.after` timers.
+- A streaming event is raised with `$.turn.step(e)` and read to its end (`for await`); the test's
+  stub is an async generator returning the result. `$.turn.complete(e)` needs `answer`,
+  `durationMs`, `isAborted` and `reason`; an input that does not validate (`usage: null`, an
+  empty `model`) is dropped without an error, so the hooks never run.
+- A test's `$` has no `state`: check what a hook wrote through what it draws.
+- A component instance mounts once per surface in a test (a second `$.ui.mount` of the same
+  `requestId` throws); keep the handle and call `drawn()` again after each change.

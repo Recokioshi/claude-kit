@@ -1,0 +1,60 @@
+{
+  "frames": [
+    {
+      "ms": 4200,
+      "label": "at rest"
+    },
+    {
+      "ms": 170,
+      "label": "B3 departs",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}▮▮▮▮{/}{dim}▯▯▯▯▯▯{/} {bold}B4{/} Upgrade prompt copy  {dim}2 AGENTS{/}  {success}GATE ✓ 4m{/}  {dim}c41e7b2 0m{/}  {dim}3h12m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/} {bold}B4{/} Upgrade prompt copy  {success}GATE ✓ 4m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}                       {accent}▮▮▮▮▮▮▮▮▮{/}{dim}▯▯▯▯▯▯▯▯▯▯▯{/}  {bold}8/18{/}",
+        "7": " {bold}PLAN{/}                                   {success}A API 5/5{/}  {bold}B UI 3/6{/}  {dim}C Docs 0/7{/}",
+        "11": "   {dim}B3{/}    {dim}Seat limit checks{/}                   {dim}DEPARTED{/}  {dim}c41e7b2{/}",
+        "12": " {bg2}{inverse} {/} {bold}B4{/}    {bold}Upgrade prompt copy{/}                 {dim}ON TIME{/}   opus Read     0m{/}",
+        "17": "   {dim}GATE{/}  {success}✓ passed 4m{/} {dim}· 52s{/}                   {dim}GIT{/}   c41e7b2 0m {dim}· 7 today{/}"
+      }
+    },
+    {
+      "ms": 170,
+      "label": "flap turns",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}▮▮▮▮{/}{dim}▯▯▯▯▯▯{/} {bold}B4{/} Upgrade prompt copy  {dim}2 AGENTS{/}  {success}GATE ✓ 4m{/}  {dim}c41e7b2 0m{/}  {dim}3h12m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/} {bold}B4{/} Upgrade prompt copy  {success}GATE ✓ 4m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}                       {accent}▮▮▮▮▮▮▮▮▮{/}{dim}▯▯▯▯▯▯▯▯▯▯▯{/}  {bold}8/18{/}",
+        "7": " {bold}PLAN{/}                                   {success}A API 5/5{/}  {bold}B UI 3/6{/}  {dim}C Docs 0/7{/}",
+        "11": "   {dim}B3{/}    {dim}Seat limit checks{/}                   {dim}DEPARTED{/}  {dim}c41e7b2{/}",
+        "12": " {bg2}{inverse} {/} {bold}B4{/}    {bold}Upgrade prompt copy{/}                 {bold}▀▀▀▀▀▀▀▀{/}  opus Read     0m{/}",
+        "17": "   {dim}GATE{/}  {success}✓ passed 4m{/} {dim}· 52s{/}                   {dim}GIT{/}   c41e7b2 0m {dim}· 7 today{/}"
+      }
+    },
+    {
+      "ms": 170,
+      "label": "flap turns",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}▮▮▮▮{/}{dim}▯▯▯▯▯▯{/} {bold}B4{/} Upgrade prompt copy  {dim}2 AGENTS{/}  {success}GATE ✓ 4m{/}  {dim}c41e7b2 0m{/}  {dim}3h12m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/} {bold}B4{/} Upgrade prompt copy  {success}GATE ✓ 4m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}                       {accent}▮▮▮▮▮▮▮▮▮{/}{dim}▯▯▯▯▯▯▯▯▯▯▯{/}  {bold}8/18{/}",
+        "7": " {bold}PLAN{/}                                   {success}A API 5/5{/}  {bold}B UI 3/6{/}  {dim}C Docs 0/7{/}",
+        "11": "   {dim}B3{/}    {dim}Seat limit checks{/}                   {dim}DEPARTED{/}  {dim}c41e7b2{/}",
+        "12": " {bg2}{inverse} {/} {bold}B4{/}    {bold}Upgrade prompt copy{/}                 {bold}▄▄▄▄▄▄▄▄{/}  opus Read     0m{/}",
+        "17": "   {dim}GATE{/}  {success}✓ passed 4m{/} {dim}· 52s{/}                   {dim}GIT{/}   c41e7b2 0m {dim}· 7 today{/}"
+      }
+    },
+    {
+      "ms": 5200,
+      "label": "B4 boarding",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}▮▮▮▮{/}{dim}▯▯▯▯▯▯{/} {bold}B4{/} Upgrade prompt copy  {dim}2 AGENTS{/}  {success}GATE ✓ 4m{/}  {dim}c41e7b2 0m{/}  {dim}3h12m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/} {bold}B4{/} Upgrade prompt copy  {success}GATE ✓ 4m{/}           {warning}{inverse}?{/}{/} {bold}1{/}  {warning}~{/} {bold}1{/}",
+      "pane": {
+        "1": "   {dim}claude/team-billing{/}                       {accent}▮▮▮▮▮▮▮▮▮{/}{dim}▯▯▯▯▯▯▯▯▯▯▯{/}  {bold}8/18{/}",
+        "7": " {bold}PLAN{/}                                   {success}A API 5/5{/}  {bold}B UI 3/6{/}  {dim}C Docs 0/7{/}",
+        "11": "   {dim}B3{/}    {dim}Seat limit checks{/}                   {dim}DEPARTED{/}  {dim}c41e7b2{/}",
+        "12": " {bg2}{inverse} {/} {bold}B4{/}    {bold}Upgrade prompt copy{/}                 {bold}BOARDING{/}  opus Read     0m{/}",
+        "17": "   {dim}GATE{/}  {success}✓ passed 4m{/} {dim}· 52s{/}                   {dim}GIT{/}   c41e7b2 0m {dim}· 7 today{/}"
+      }
+    }
+  ]
+}

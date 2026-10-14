@@ -1,7 +1,10 @@
 import { describe, expect, mock, test } from 'claude-code/testing'
 import type { On } from 'claude-code'
+import type { TestBody } from 'claude-code/testing'
 
-import { SAMPLE } from './logic.test'
+import Hooks from '../hooks'
+import type { PaneActions, PaneView, ViewData } from '../hooks'
+import { SAMPLE, notebookData } from './logic.test'
 
 const ROOT = '/Users/me/dev/web-app'
 const TOOL = 'mcp__progress-pane__worklog'
@@ -417,15 +420,19 @@ describe('answering from the pane', () => {
     expect(sent.join('\n')).toContain('Added the key to .env.local, carry on')
   })
 
-  test('on desktop the sections are labels, not rows of ─ that wrap', async ($, on) => {
+  test('on desktop the sections are labels, not rows of ┄ that wrap, and the margin line is dropped', async ($, on) => {
     engineOf(on, { [FILE]: ASK })
     await start($)
     await progress($)
     const desk = await $.ui.mount({ plugin: 'progress-pane', surface: 'desktop', component: 'Pane', requestId: 'progress', props: PANE_PROPS })
-    // The meter stays (10 cells); a section rule would be a much longer run.
-    expect(JSON.stringify(await desk.drawn())).not.toContain('─'.repeat(12))
+    const deskDrawn = JSON.stringify(await desk.drawn())
+    expect(deskDrawn).not.toContain('┄'.repeat(12))
+    expect(deskDrawn).not.toContain('│')
+    // The one-box-per-step meter stays on desktop: 6 steps, 6 boxes.
+    expect(deskDrawn).toContain('"■■"')
+    expect(deskDrawn).toContain('"□□□□"')
     const term = await $.ui.mount({ plugin: 'progress-pane', surface: 'terminal', component: 'Pane', requestId: 'progress', props: PANE_PROPS })
-    expect(JSON.stringify(await term.drawn())).toContain('─'.repeat(12))
+    expect(JSON.stringify(await term.drawn())).toContain('┄'.repeat(12))
   })
 })
 
@@ -438,7 +445,166 @@ describe('VS Code', () => {
     expect(await pane.find({ key: 'phase-A' })).toBeDefined()
     await pane.press({ key: 'open-A2' })
     expect(await pane.find({ text: /DETAILS/ })).toBeDefined()
-    // A proportional font, like the desktop: sections are labels, not rows of ─.
-    expect(JSON.stringify(await pane.drawn())).not.toContain('─'.repeat(12))
+    // A proportional font, like the desktop: sections are labels, not rows of ┄.
+    expect(JSON.stringify(await pane.drawn())).not.toContain('┄'.repeat(12))
+  })
+})
+
+/** A drawn element's text, as the terminal lays it out: strings in order, a plain Button's hotkey as `1: `. */
+type Drawn = { type?: string; props?: Record<string, unknown>; children?: Array<Drawn | string> }
+function textOfDrawn(node: Drawn | string): string {
+  if (typeof node === 'string') return node
+  const inner = (node.children ?? []).map(textOfDrawn).join('')
+  if (node.type !== 'Button') return inner
+  const hotkey = node.props?.plain && typeof node.props.hotkey === 'string' ? `${node.props.hotkey}: ` : ''
+  return `${hotkey}${node.children?.length ? inner : String(node.props?.label ?? '')}`
+}
+const NO_ACTIONS: PaneActions = { tab: () => {}, file: () => {}, close: () => {}, openStep: () => {}, openAgent: () => {}, togglePhase: () => {}, back: () => {}, move: () => {}, openNeeds: () => {}, answer: () => {}, replyInChat: () => {} }
+
+/** The pane drawn straight from `data` on a surface, as rows of text. */
+async function pageRows($: Parameters<TestBody>[0], on: On, data: ViewData, opts: { surface?: 'terminal' | 'desktop'; columns?: number; rows?: number; ui?: Partial<PaneView> } = {}) {
+  const surface = opts.surface ?? 'terminal'
+  const ui: PaneView = { tab: 'overview', expanded: {}, ...opts.ui }
+  on('ui.render', { component: 'Pane', requestId: 'notebook' }, ($$, e) => Hooks.drawPane($$.ui.resolve(e), data, ui, NO_ACTIONS, opts.columns ?? 74, opts.rows ?? 24, false, surface === 'terminal'))
+  const pane = await $.ui.mount({ plugin: 'progress-pane', surface, component: 'Pane', requestId: 'notebook', props: { bodyColumns: opts.columns ?? 74, placement: 'dock', scroll: { bodyRows: opts.rows ?? 24 } } as never })
+  const tree = await pane.drawn() as Drawn
+  return { rows: (tree.children ?? []).map(textOfDrawn), tree, pane }
+}
+
+describe('the Notebook page, measured against the gallery mock', () => {
+  test('at 74 columns (72 body) every Overview row goes through the 5-cell frame and notes end on cell 71', async ($, on) => {
+    const { rows } = await pageRows($, on, notebookData())
+    const mock = [
+      ' ! │ Add team billing                                             3h12m',
+      '   │ claude/team-billing                       ■■■■■■■□□□□□□□□□□□  7/18',
+      '   │',
+      `   │ NEEDS YOU ${'┄'.repeat(57)}`,
+      ' ? │ D1 Bill per seat or per workspace?                       blocks B4',
+      ' ~ │ commit 3f2a1bc not linked to a step                             3m',
+      '   │',
+      `   │ PLAN ${'┄'.repeat(51)}  ✓A ▸B □C`,
+      ' ▸ │ B UI                                                           2/6',
+      ' ✓ │ B1 Hide billing tab                                        3f2a1bc',
+      ' ✓ │ B2 Plan picker                                             9e1d0aa',
+      ' ✎ │ B3 Seat limit checks                                opus 6m · Edit ',
+      ' □ │ B4 Upgrade prompt copy                                        ? D1',
+      ' □ │ B5 Invoice history list                                  sonnet 1m',
+      ' □ │ B6 Empty states',
+      '   │',
+      `   │ SIGNALS ${'┄'.repeat(59)}`,
+      '   │ gate    ✓ passed 4m ago · took 52s',
+      '   │ git     9e1d0aa 2m ago · 6 today',
+      // Two labelled figures (the session's cost may or may not include its subagents).
+      '   │ ctx     61% · session $4.10 · agents ≈$1.32',
+      '   │',
+    ]
+    expect(rows.slice(0, mock.length)).toEqual(mock)
+    // Notes end on cell 71; rules and the highlighter run to cell 72.
+    for (const i of [0, 1, 4, 5, 7, 8, 9, 13]) expect([...(rows[i] ?? '')].length).toBe(71)
+    for (const i of [3, 11, 16]) expect([...(rows[i] ?? '')].length).toBe(72)
+    // Seven tabs do not fit 67 cells with 2-cell gaps: the gaps close to 1 and "Needs you" reads "Needs".
+    expect(rows[mock.length]).toBe('   │ 1:  Overview 2: Plan3: Log4: Agentsn: Needs 2o: Filex: Close')
+  })
+
+  test('the doing row carries the highlighter as the body background; the current tab is a highlighter chip', async ($, on) => {
+    const { tree } = await pageRows($, on, notebookData())
+    const json = JSON.stringify(tree)
+    expect(json).toContain('{"type":"Box","props":{"flexDirection":"row","backgroundColor":"#3a3418"}')
+    expect(json).toContain('{"type":"Text","props":{"backgroundColor":"#3a3418"},"children":[" Overview"," "]}')
+    expect(json).toContain('{"type":"Text","props":{"color":"subtle"},"children":["│"]}')
+  })
+
+  test('with no highlighter (theme unknown): bold and the pen mark the doing row, the footer keeps [brackets]', async ($, on) => {
+    const { rows, tree } = await pageRows($, on, notebookData({ tones: Hooks.DEFAULT_TONES }))
+    expect(JSON.stringify(tree)).not.toContain('backgroundColor')
+    expect(rows).toContain(' ✎ │ B3 Seat limit checks                                opus 6m · Edit')
+    expect(rows.some(r => r.includes('1: [Overview]'))).toBe(true)
+  })
+
+  test('SIGNALS shows the branch before the sha when git reports one', async ($, on) => {
+    const d = notebookData()
+    const { rows } = await pageRows($, on, { ...d, facts: { ...d.facts, branch: 'claude/team-billing' } })
+    expect(rows).toContain('   │ git     claude/team-billing · 9e1d0aa 2m ago · 6 today')
+  })
+
+  test('with no subagents the ctx row has the session figure alone', async ($, on) => {
+    const d = notebookData()
+    const { rows } = await pageRows($, on, { ...d, facts: { ...d.facts, agents: [] } })
+    expect(rows).toContain('   │ ctx     61% · session $4.10')
+    expect(rows.some(r => r.includes('Agents'))).toBe(false)
+  })
+
+  test('a short pane keeps the four blank rows and folds the steps into "+N more"', async ($, on) => {
+    const { rows } = await pageRows($, on, notebookData(), { rows: 12 })
+    expect(rows.filter(r => r === '   │')).toHaveLength(4)
+    expect(rows.some(r => /^ {3}│ \+\d+ more$/.test(r))).toBe(true)
+  })
+
+  test('with nothing asked or noticed the top section is omitted and the rhythm kept', async ($, on) => {
+    const d = notebookData()
+    const { rows } = await pageRows($, on, { ...d, drift: [], doc: { ...d.doc, attention: [] } })
+    expect(rows.some(r => r.includes('NEEDS YOU') || r.includes('NOTICED'))).toBe(false)
+    expect(rows.filter(r => r === '   │')).toHaveLength(3)
+    expect(rows[2]).toBe('   │')
+    expect(rows[3]?.startsWith('   │ PLAN ┄')).toBe(true)
+  })
+
+  test('below 48 columns the margin line is dropped and step notes collapse to the sha', async ($, on) => {
+    const { rows } = await pageRows($, on, notebookData(), { columns: 46 })
+    expect(rows.some(r => r.includes('│'))).toBe(false)
+    expect(rows.some(r => r.startsWith(' ✓ B1 Hide billing tab') && r.endsWith('3f2a1bc'))).toBe(true)
+    expect(rows.some(r => r.includes('opus'))).toBe(false)
+  })
+
+  test('desktop keeps the frame as layout: a 3-wide margin Box, 8-wide labels, no │ or ┄', async ($, on) => {
+    const { tree } = await pageRows($, on, notebookData(), { surface: 'desktop' })
+    const json = JSON.stringify(tree)
+    expect(json).not.toContain('│')
+    expect(json).not.toContain('┄')
+    expect(json).toContain('{"type":"Box","props":{"width":3,"justifyContent":"center"}')
+    expect(json).toContain('{"type":"Box","props":{"width":8},"children":[{"type":"Text","props":{"dimColor":true},"children":["gate"]}]}')
+    expect(json).toContain('■■■■■■■')
+  })
+
+  test('the Log is a ledger: § in the margin for a Ruling, the time as the first 6 body cells', async ($, on) => {
+    const { rows } = await pageRows($, on, notebookData(), { ui: { tab: 'log' } })
+    expect(rows).toContain('   │ 16:40 B2 done: plan picker; dod ✓')
+    expect(rows.some(r => r.startsWith(' § │ 16:05 Ruling: per-seat prices cached for a day'))).toBe(true)
+  })
+
+  test('step details: the labels share 8 cells in the body column', async ($, on) => {
+    const { rows } = await pageRows($, on, notebookData(), { ui: { tab: 'step', step: 'B2', back: 'plan' } })
+    expect(rows[0]).toContain('b: ← Plan')
+    expect(rows).toContain(' ✓ │ B2 Plan picker')
+    expect(rows.some(r => r.startsWith('   │ status  done'))).toBe(true)
+    expect(rows).toContain('   │ commit  9e1d0aa x · 2m ago')
+  })
+})
+
+describe('the Agents tab', () => {
+  test('the footer shows 4: Agents once a subagent ran; the band\'s agents open it', async ($, on) => {
+    engineOf(on, { [`${ROOT}/plans/a-worklog.md`]: SAMPLE })
+    await start($)
+    const props = { bodyColumns: 64, placement: 'dock', scroll: { offset: 0, bodyRows: 30 } } as never
+    await progress($)
+    const before = await $.ui.mount({ plugin: 'progress-pane', surface: 'terminal', component: 'Pane', requestId: 'progress', props })
+    expect(await before.find({ key: 'tab-agents' })).toBeUndefined()
+    await before.unmount()
+    await $.agent.spawn({ prompt: 'x', description: 'A3 seat count', subagentType: 'general-purpose', model: 'opus', parentModel: 'claude-opus-5-5', background: true, fork: false } as never)
+    const band = await $.ui.mount({ plugin: 'progress-pane', surface: 'terminal', component: 'AbovePrompt', props: { hasSurvey: false, isWorking: true, maxRows: 3, bodyColumns: 120 } as never })
+    await band.press({ key: 'band-agents' })
+    const pane = await $.ui.mount({ plugin: 'progress-pane', surface: 'terminal', component: 'Pane', requestId: 'progress', props })
+    // The current tab, in brackets while the theme is unknown.
+    expect(await pane.find({ text: /^4: \[Agents\]$|\[Agents\]/ })).toBeDefined()
+    await pane.press({ key: 'tab-overview' })
+    expect(await pane.find({ text: /\[Overview\]/ })).toBeDefined()
+    await pane.press({ key: 'tab-agents' })
+    expect(await pane.find({ text: /\[Agents\]/ })).toBeDefined()
+  })
+
+  test('the agent page has its own nav: back to Agents, prev / next, Close', async ($, on) => {
+    const { rows, pane } = await pageRows($, on, notebookData(), { ui: { tab: 'agent', agent: 'a1', back: 'agents' } })
+    expect(rows[0]).toContain('b: ← Agents')
+    for (const key of ['agent-back', 'agent-prev', 'agent-next', 'close']) expect(await pane.find({ key })).toBeDefined()
   })
 })

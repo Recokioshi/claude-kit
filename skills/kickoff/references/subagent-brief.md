@@ -26,6 +26,7 @@ One or two lines: what this step is for, and where it sits in the plan (phase, w
 - Gate: `<gate command>` must be green before you commit
 - Tests: add/extend <test files> so the step is covered
 - User-facing text follows the project's voice/style guide <skill or doc> (if any)
+- Progress (when the progress-pane mod is installed): after reading this brief, call the `worklog` tool with op `progress`, `total` = your plan in 3-8 steps, `done: 0`, `note` = the first step; call it again as each step ends. The user follows it in the Agents tab.
 
 ## Never
 - merge, rebase onto, or push any branch · git stash · edit the worklog · touch files outside <area>

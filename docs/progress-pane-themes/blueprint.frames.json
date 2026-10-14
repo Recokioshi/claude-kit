@@ -1,0 +1,42 @@
+{
+  "frames": [
+    {
+      "ms": 3600,
+      "label": "at rest"
+    },
+    {
+      "ms": 160,
+      "label": "datum walks",
+      "pane": {
+        "1": " {accent}├{/}{success}━━━━━━━━━━━━━━━━━━━━━━━━━━━{/}{accent}┼───{/} {accent2}{bold}7/18{/}{/} {accent}───────────────────────────────┤{/}"
+      }
+    },
+    {
+      "ms": 160,
+      "label": "datum walks",
+      "pane": {
+        "1": " {accent}├{/}{success}━━━━━━━━━━━━━━━━━━━━━━━━━━━━{/}{accent}┼──{/} {accent2}{bold}7/18{/}{/} {accent}───────────────────────────────┤{/}"
+      }
+    },
+    {
+      "ms": 160,
+      "label": "datum walks",
+      "pane": {
+        "1": " {accent}├{/}{success}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{/}{accent}┼─{/} {accent2}{bold}7/18{/}{/} {accent}───────────────────────────────┤{/}"
+      }
+    },
+    {
+      "ms": 4200,
+      "label": "B3 done",
+      "band100": "{error}{bold}!{/}{/} {bold}8/18{/} {accent}├{/}{success}━━━━{/}{accent}┼─────┤{/}  B4 Upgrade prompt copy {dim}╎{/} {dim}2 agents{/} {dim}╎{/} {success}gate ✓ 4m{/} {dim}╎{/} {dim}c41e7b2 now{/} {dim}╎{/} {dim}3h12m{/}    {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "band60": "{error}{bold}!{/}{/} {bold}8/18{/}  B4 Upgrade prompt copy {dim}╎{/} {success}gate ✓ 4m{/}          {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "pane": {
+        "1": " {accent}├{/}{success}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━{/}{accent}┼{/} {accent2}{bold}8/18{/}{/} {accent}───────────────────────────────┤{/}",
+        "8": "  {success}{bold}▶{/}{/} {bold}B  UI{/}                                                           {accent2}{bold}3/6{/}{/}",
+        "11": "    {success}✓{/} {dim}B3  Seat limit checks{/}                                     {dim}c41e7b2{/}",
+        "12": "    {success}{bold}●{/}{/} {bold}B4  Upgrade prompt copy{/}                              {dim}opus 0m Read{/}",
+        "17": " {accent}│{/}  {success}✓ passed{/}  {dim}4m · 52s{/}  {accent}│{/}  c41e7b2  {dim}now · 7 today{/} {accent}│{/}  61%   {accent}│{/}  $4.10   {accent}│{/}"
+      }
+    }
+  ]
+}

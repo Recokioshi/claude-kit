@@ -28,8 +28,8 @@
     {
       "name": "progress-pane",
       "source": "./mods/progress-pane",
-      "description": "Mission control for long tasks: a validated worklog tool Claude updates at every step (done only after a green gate), facts the mod sees for itself (gate runs, commits, agents, dev servers, context and cost), drift hints where the two disagree, one band line above the prompt and a /progress pane.",
-      "version": "0.2.1",
+      "description": "Mission control for long tasks, in a Notebook look: a validated worklog tool Claude updates at every step (done only after a green gate), facts the mod sees for itself (gate runs, commits, branch, agents, context and cost), drift hints where the two disagree, a band above the prompt, a /progress pane, and an Agents tab where every subagent has a pixel companion with its own progress, figures and log.",
+      "version": "0.3.0",
       "author": {
         "name": "Adrian Gaik"
       }

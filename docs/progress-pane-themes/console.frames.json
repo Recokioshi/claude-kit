@@ -1,0 +1,89 @@
+{
+  "frames": [
+    {
+      "ms": 2400,
+      "label": "at rest"
+    },
+    {
+      "ms": 1000,
+      "label": "beacon breathes",
+      "pane": {
+        "0": "{dim}┌─ {/}{accent}{bold}WORKLOG{/}{/}{dim} ────────────────────────────────────────────────{/} {accent2}◎{/} {accent2}T+3h12m{/} {dim}─┐{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "beacon breathes"
+    },
+    {
+      "ms": 1000,
+      "label": "beacon breathes",
+      "pane": {
+        "0": "{dim}┌─ {/}{accent}{bold}WORKLOG{/}{/}{dim} ────────────────────────────────────────────────{/} {accent2}◎{/} {accent2}T+3h12m{/} {dim}─┐{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "gate starts",
+      "band100": "{error}{bold}!{/}{/} {bold}7/18{/} {accent2}━━━━{/}{dim}──────{/}  B3 Seat limit checks {dim}│{/} {dim}AGENTS{/} 2 {dim}│{/} {dim}GATE{/} {accent2}● running{/} {dim}│{/} 9e1d0aa {dim}2m{/} {dim}│{/} {accent2}3h12m{/}    {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "band60": "{error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks {dim}│{/} {dim}GATE{/} {accent2}● running{/}       {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "pane": {
+        "2": "{dim}│{/}   {dim}STEPS{/}  {bold}7/18{/}  {accent2}━━━━━━━━{/}{dim}────────────{/}   {dim}AGENTS{/}  {bold}2{/}   {dim}GATE{/}  {accent2}● running{/}    {dim}│{/}",
+        "18": "{dim}│{/}   {dim}GATE{/}   {accent2}● running{/}   0m ago                             {dim}CTX{/}      61% {dim}│{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "gate running",
+      "band100": "{error}{bold}!{/}{/} {bold}7/18{/} {accent2}━━━━{/}{dim}──────{/}  B3 Seat limit checks {dim}│{/} {dim}AGENTS{/} 2 {dim}│{/} {dim}GATE{/} {accent2}● running{/} {dim}│{/} 9e1d0aa {dim}2m{/} {dim}│{/} {accent2}3h12m{/}    {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "band60": "{error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks {dim}│{/} {dim}GATE{/} {accent2}● running{/}       {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "pane": {
+        "0": "{dim}┌─ {/}{accent}{bold}WORKLOG{/}{/}{dim} ────────────────────────────────────────────────{/} {accent2}◎{/} {accent2}T+3h12m{/} {dim}─┐{/}",
+        "2": "{dim}│{/}   {dim}STEPS{/}  {bold}7/18{/}  {accent2}━━━━━━━━{/}{dim}────────────{/}   {dim}AGENTS{/}  {bold}2{/}   {dim}GATE{/}  {accent2}● running{/}    {dim}│{/}",
+        "18": "{dim}│{/}   {dim}GATE{/}   {accent2}● running{/}   0m ago                             {dim}CTX{/}      61% {dim}│{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "gate running",
+      "band100": "{error}{bold}!{/}{/} {bold}7/18{/} {accent2}━━━━{/}{dim}──────{/}  B3 Seat limit checks {dim}│{/} {dim}AGENTS{/} 2 {dim}│{/} {dim}GATE{/} {accent2}● running{/} {dim}│{/} 9e1d0aa {dim}2m{/} {dim}│{/} {accent2}3h12m{/}    {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "band60": "{error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks {dim}│{/} {dim}GATE{/} {accent2}● running{/}       {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "pane": {
+        "2": "{dim}│{/}   {dim}STEPS{/}  {bold}7/18{/}  {accent2}━━━━━━━━{/}{dim}────────────{/}   {dim}AGENTS{/}  {bold}2{/}   {dim}GATE{/}  {accent2}● running{/}    {dim}│{/}",
+        "18": "{dim}│{/}   {dim}GATE{/}   {accent2}● running{/}   0m ago                             {dim}CTX{/}      61% {dim}│{/}"
+      }
+    },
+    {
+      "ms": 2000,
+      "label": "gate passes",
+      "band100": "{error}{bold}!{/}{/} {bold}7/18{/} {accent2}━━━━{/}{dim}──────{/}  B3 Seat limit checks {dim}│{/} {dim}AGENTS{/} 2 {dim}│{/} {dim}GATE{/} {success}✓ 0m{/} {dim}│{/} 9e1d0aa {dim}2m{/} {dim}│{/} {accent2}3h12m{/}         {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "band60": "{error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks {dim}│{/} {dim}GATE{/} {success}✓ 0m{/}            {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "pane": {
+        "0": "{dim}┌─ {/}{accent}{bold}WORKLOG{/}{/}{dim} ────────────────────────────────────────────────{/} {success}◉{/} {accent2}T+3h12m{/} {dim}─┐{/}",
+        "2": "{dim}│{/}   {dim}STEPS{/}  {bold}7/18{/}  {accent2}━━━━━━━━{/}{dim}────────────{/}   {dim}AGENTS{/}  {bold}2{/}   {dim}GATE{/}  {success}✓ 0m{/}         {dim}│{/}",
+        "18": "{dim}│{/}   {dim}GATE{/}   {success}✓ passed{/}    0m ago  {dim}    51s{/}                    {dim}CTX{/}      61% {dim}│{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "back to amber",
+      "band100": "{error}{bold}!{/}{/} {bold}7/18{/} {accent2}━━━━{/}{dim}──────{/}  B3 Seat limit checks {dim}│{/} {dim}AGENTS{/} 2 {dim}│{/} {dim}GATE{/} {success}✓ 0m{/} {dim}│{/} 9e1d0aa {dim}2m{/} {dim}│{/} {accent2}3h12m{/}         {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "band60": "{error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks {dim}│{/} {dim}GATE{/} {success}✓ 0m{/}            {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "pane": {
+        "2": "{dim}│{/}   {dim}STEPS{/}  {bold}7/18{/}  {accent2}━━━━━━━━{/}{dim}────────────{/}   {dim}AGENTS{/}  {bold}2{/}   {dim}GATE{/}  {success}✓ 0m{/}         {dim}│{/}",
+        "18": "{dim}│{/}   {dim}GATE{/}   {success}✓ passed{/}    0m ago  {dim}    51s{/}                    {dim}CTX{/}      61% {dim}│{/}"
+      }
+    },
+    {
+      "ms": 1000,
+      "label": "beacon breathes",
+      "band100": "{error}{bold}!{/}{/} {bold}7/18{/} {accent2}━━━━{/}{dim}──────{/}  B3 Seat limit checks {dim}│{/} {dim}AGENTS{/} 2 {dim}│{/} {dim}GATE{/} {success}✓ 0m{/} {dim}│{/} 9e1d0aa {dim}2m{/} {dim}│{/} {accent2}3h12m{/}         {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "band60": "{error}{bold}!{/}{/} {bold}7/18{/}  B3 Seat limit checks {dim}│{/} {dim}GATE{/} {success}✓ 0m{/}            {warning}{bold}?{/}{/} 1  {warning}{bold}~{/}{/} 1",
+      "pane": {
+        "0": "{dim}┌─ {/}{accent}{bold}WORKLOG{/}{/}{dim} ────────────────────────────────────────────────{/} {accent2}◎{/} {accent2}T+3h12m{/} {dim}─┐{/}",
+        "2": "{dim}│{/}   {dim}STEPS{/}  {bold}7/18{/}  {accent2}━━━━━━━━{/}{dim}────────────{/}   {dim}AGENTS{/}  {bold}2{/}   {dim}GATE{/}  {success}✓ 0m{/}         {dim}│{/}",
+        "18": "{dim}│{/}   {dim}GATE{/}   {success}✓ passed{/}    0m ago  {dim}    51s{/}                    {dim}CTX{/}      61% {dim}│{/}"
+      }
+    }
+  ]
+}

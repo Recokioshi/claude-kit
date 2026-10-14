@@ -18,13 +18,22 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
+import { addAgent, newAgent, normalizeAgent, withEnd, withProgress, withResume, withTool, withUsage } from './crew'
+import type { AgentRow } from './observe'
+import { COMPANION_COLS, COMPANION_ROWS, companionPixels, rasterCells, WORKING_FRAMES } from './companions'
+import { effortOf, familyOf, poseOf, rosterOf } from './crew'
 import { applyOp, TOOL_DESCRIPTION, TOOL_SCHEMA } from './ops'
 import type { ToolInput } from './ops'
 import { commitFromOutput, driftOf, dueNotices, EMPTY_FACTS, gateRunOf, isCommitCommand, isDocsOnly, outputShowsFailure, serverOf, stepOfDescription, toolLabel } from './observe'
 import type { Facts } from './observe'
+import { companionKey } from './agents'
 import { currentStepOf, drawBand, drawPane, isExpanded, textOf } from './view'
 import type { Answer, PaneView, ViewData } from './view'
+import { tonesOf } from './view-types'
+import type { Tones } from './view-types'
 import { parseWorklog, serializeWorklog, startedMs } from './worklog'
+import { branchesSince, countOf, emptyRun, parseNameStatus, parseRun, parseShortstat, runKey, withAgentRequest, withAgentRun, withAgentSpawn, withCrewMember, withMainRequest, withMainTurn, withToolCall } from './runstats'
+import type { GitStats, RunStats } from './runstats'
 import type { ParseError, Worklog } from './worklog'
 
 const PANE = 'progress'
@@ -38,7 +47,16 @@ const worklog = atom({ plugin: 'progress-pane', key: 'worklog' } as const, EMPTY
 const facts = atom({ plugin: 'progress-pane', key: 'facts' } as const, EMPTY_FACTS)
 /** Answers given in the pane, and whether a model turn is running to take them mid-step. */
 const inbox = atom({ plugin: 'progress-pane', key: 'inbox' } as const, { answered: [] as Answer[], isTurnRunning: false })
+/** This run's totals (one worklog), loaded from the plugin store and written back at each turn's end. */
+const run = atom({ plugin: 'progress-pane', key: 'run' } as const, emptyRun(null))
 const view = atom({ plugin: 'progress-pane', key: 'view' } as const, { tab: 'overview', expanded: {}, isBandHidden: false } as PaneView & { isBandHidden: boolean })
+
+/** Notebook's colors for this session, from the theme setting (session.start reads it again on reload). */
+let tones: Tones = tonesOf(undefined, undefined)
+/** How often a working companion moves: two frames a second, calm. */
+const BLIT_MS = 500
+/** Whether the terminal drew the Agents tab or an agent page last; the timer is quiet otherwise. */
+let isCrewShown = false
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const clockOf = (ms: number) => `${pad2(new Date(ms).getHours())}:${pad2(new Date(ms).getMinutes())}`
@@ -85,6 +103,8 @@ async function load($: EngineInterface, path: string): Promise<LogState | null> 
       if (isSame && prev.doc && s.status === 'done' && !wasDone.has(s.id)) next.doneAt = { ...next.doneAt, [s.id]: now }
     }
     await update($, worklog, () => next)
+    await loadRun($, path)
+    if (parsed.doc?.meta.status === 'done' && (await read($, run)).git === undefined) void refreshGit($)
     return next
   } catch {
     return null
@@ -140,9 +160,10 @@ async function poll($: EngineInterface): Promise<void> {
 async function viewData($: EngineInterface): Promise<ViewData | null> {
   const state = await read($, worklog)
   if (state.doc === null || state.path === null) return null
-  const f = await read($, facts)
+  const read0 = await read($, facts)
+  const f = { ...read0, agents: read0.agents.map(normalizeAgent) }
   const now = await $.clock.now()
-  return { doc: state.doc, path: state.path, facts: f, drift: driftOf(state.doc, f, state.startedAt, now, state.doneAt ?? {}), now, startedMs: startedMs(state.doc), startedAt: state.startedAt, doneAt: state.doneAt ?? {}, answered: (await read($, inbox)).answered }
+  return { doc: state.doc, path: state.path, facts: f, drift: driftOf(state.doc, f, state.startedAt, now, state.doneAt ?? {}), now, startedMs: startedMs(state.doc), startedAt: state.startedAt, doneAt: state.doneAt ?? {}, answered: (await read($, inbox)).answered, tones, run: await read($, run) }
 }
 
 const answerText = (a: Answer) =>
@@ -222,7 +243,113 @@ async function scrollTop($: EngineInterface): Promise<void> {
   }
 }
 
+/** The run of the worklog at `path`, from the plugin store (shared by every window of this plugin: last write wins). */
+async function loadRun($: EngineInterface, path: string): Promise<void> {
+  if ((await read($, run)).path === path) return
+  let stored: unknown = null
+  try {
+    stored = await $.store.get(runKey(path))
+  } catch {
+    stored = null
+  }
+  await update($, run, () => parseRun(stored, path))
+}
+
+async function flushRun($: EngineInterface): Promise<void> {
+  const r = await read($, run)
+  if (r.path === null) return
+  try {
+    await $.store.set(runKey(r.path), r)
+  } catch {
+    // the store is unavailable (a test, a policy): the totals stay for this session
+  }
+}
+
+/** Adds to this run only while its worklog is the active one: what came before or after is not the run's. */
+async function onRun($: EngineInterface, change: (r: RunStats) => RunStats): Promise<void> {
+  const state = await read($, worklog)
+  if (state.doc?.meta.status !== 'active' || state.path === null) return
+  if ((await read($, run)).path !== state.path) await loadRun($, state.path)
+  await update($, run, change)
+}
+
+async function git($: EngineInterface, args: string[]): Promise<string | null> {
+  try {
+    const out = await $.process.run(['git', ...args], { cwd: await rootOf($), timeoutMs: 10_000 })
+    return out.exitCode === 0 ? out.stdout : null
+  } catch {
+    return null
+  }
+}
+
+/** The empty tree: the base when the run's first commit is the repository's first. */
+const EMPTY_TREE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904'
+
+/**
+ * What git shows for the finished run: commits and merges since its base,
+ * branches with a commit since it started, and the net diff (files, lines).
+ * Kept in the run; null when git cannot tell.
+ */
+async function refreshGit($: EngineInterface): Promise<void> {
+  const state = await read($, worklog)
+  const doc = state.doc
+  if (doc === null || state.path === null) return
+  await loadRun($, state.path)
+  const r = await read($, run)
+  const began = startedMs(doc)
+  const branch = doc.meta.branch
+  const head = branch && (await git($, ['rev-parse', '--verify', '--quiet', branch])) !== null ? branch : 'HEAD'
+  let base = r.base ?? null
+  if (base === null && began !== null) {
+    const first = (await git($, ['rev-list', '--reverse', `--since=${new Date(began).toISOString()}`, head]))?.split('\n')[0]?.trim()
+    base = first ? ((await git($, ['rev-parse', '--verify', '--quiet', `${first}^`])) !== null ? `${first}^` : EMPTY_TREE) : null
+  }
+  let stats: GitStats | null = null
+  const now = await $.clock.now()
+  if (base === null) {
+    stats = { at: now, commits: 0, merges: 0, branches: 0, filesAdded: 0, filesEdited: 0, filesRemoved: 0, linesAdded: 0, linesRemoved: 0 }
+  } else {
+    const range = base === EMPTY_TREE ? head : `${base}..${head}`
+    const [commits, merges, names, short, refs] = await Promise.all([
+      git($, ['rev-list', '--count', '--no-merges', range]),
+      git($, ['rev-list', '--count', '--merges', range]),
+      git($, ['diff', '--name-status', '-M', base, head]),
+      git($, ['diff', '--shortstat', base, head]),
+      git($, ['for-each-ref', '--format=%(refname:short) %(committerdate:unix)', 'refs/heads']),
+    ])
+    if (commits !== null && names !== null && short !== null) {
+      stats = { at: now, commits: countOf(commits), merges: countOf(merges ?? '0'), branches: began !== null && refs !== null ? branchesSince(refs, began) : 0, ...parseNameStatus(names), ...parseShortstat(short) }
+    }
+  }
+  await update($, run, x => (x.path === state.path ? { ...x, git: stats } : x))
+  await flushRun($)
+}
+
+/** The checkout's branch, for SIGNALS (the worklog's `branch` is the one planned). */
+async function refreshBranch($: EngineInterface): Promise<void> {
+  try {
+    const run = await $.process.run(['git', 'branch', '--show-current'], { cwd: await rootOf($), timeoutMs: 3000 })
+    if (run.exitCode !== 0) return
+    // Empty on a detached HEAD: no branch to show, not the last one.
+    const branch = run.stdout.trim() || undefined
+    if (branch !== (await read($, facts)).branch) await update($, facts, ({ branch: _old, ...f }) => (void _old, branch ? { ...f, branch } : f))
+  } catch {
+    // not a git checkout, or git is missing: no branch row
+  }
+}
+
+/** The person's theme picks Notebook's ink and highlighter; `pen` is the glyph setting. */
+async function refreshTones($: EngineInterface, pen: unknown): Promise<void> {
+  try {
+    const row = (await $.config.list()).find(r => r.key === 'theme')
+    tones = tonesOf(row?.value, pen)
+  } catch {
+    tones = tonesOf(undefined, pen)
+  }
+}
+
 async function refreshSession($: EngineInterface): Promise<void> {
+  void refreshBranch($)
   try {
     const usage = await $.session.usage()
     const percent = Math.round(usage.context.percent ?? ((usage.context.tokens ?? 0) / Math.max(1, usage.context.window)) * 100)
@@ -244,13 +371,45 @@ async function refreshSession($: EngineInterface): Promise<void> {
   if (alive.length !== f.servers.length) await update($, facts, x => ({ ...x, servers: alive }))
 }
 
-export const register: Register = on => {
+/**
+ * Moves each running agent's companion one frame on, in place, while the
+ * terminal shows the Agents tab or that agent's page. No redraw: a blit.
+ */
+async function animateCrew($: EngineInterface): Promise<void> {
+  if (!isCrewShown) return
+  const ui = await read($, view)
+  if (ui.tab !== 'agents' && ui.tab !== 'agent') {
+    isCrewShown = false
+    return
+  }
+  const now = await $.clock.now()
+  // A working companion moves on; a resting one settles on its still frame.
+  const running = (await read($, facts)).agents.map(normalizeAgent).filter(a => a.status === 'running' && (ui.tab === 'agents' || a.id === ui.agent))
+  const frame = Math.floor(now / BLIT_MS) % WORKING_FRAMES
+  let isMounted = running.length === 0
+  for (const a of running) {
+    const pose = poseOf(a, now)
+    const cells = rasterCells(companionPixels(familyOf(a.model), effortOf(a.effort), pose, pose === 'working' ? frame : 0))
+    try {
+      const r = await $.ui.blit({ requestId: PANE, key: companionKey(a.id), cells, columns: COMPANION_COLS, rows: COMPANION_ROWS })
+      if (r.deny === undefined) isMounted = true
+    } catch {
+      // the pane closed between two ticks
+    }
+  }
+  // Nothing of ours is mounted any more (the pane closed): wait for the next draw.
+  if (!isMounted) isCrewShown = false
+}
+
+export const register: Register = (on, options) => {
   on('session.start', async ($, e, next) => {
     await $.tool.register({ name: 'worklog', description: TOOL_DESCRIPTION, inputSchema: TOOL_SCHEMA as unknown as Record<string, unknown> })
-    await $.command.register({ name: 'progress', description: 'Show the task worklog: pane, text, or band on/off (progress-pane)', argumentHint: '[plan | <step id> | text | band on|off | use <path>]' })
+    await $.command.register({ name: 'progress', description: 'Show the task worklog: pane, text, or band on/off (progress-pane)', argumentHint: '[plan | agents | <step id> | text | band on|off | use <path>]' })
     await discover($)
+    await refreshTones($, options.pen)
     void refreshSession($)
     $.clock.every(5000, () => void poll($))
+    $.clock.every(BLIT_MS, () => void animateCrew($))
     return next(e)
   })
 
@@ -263,8 +422,16 @@ export const register: Register = on => {
   // The worklog tool: lead agent only, validated, written whole, one call at a time.
   on('tool.call', { tool: TOOL }, async ($, e) => {
     const input = e as unknown as ToolInput & { agentId?: string }
+    if (input.op === 'progress') {
+      const agentId = input.agentId
+      if (agentId === undefined) return { deny: 'op progress is for subagents reporting their own work; the lead uses op step.' }
+      const now = await $.clock.now()
+      const f = await update($, facts, x => ({ ...x, agents: x.agents.map(a => (a.id === agentId ? withProgress(normalizeAgent(a), input, now) : a)) }))
+      const p = f.agents.find(a => a.id === agentId)?.progress
+      return { result: `OK progress ${p ? `${p.done}${p.total ? `/${p.total}` : ''}` : 'noted'}` as never }
+    }
     if (input.agentId !== undefined && input.op !== 'show') {
-      return { deny: 'Only the lead agent writes the worklog. Report your result (commit sha, gate result, notes) back to the lead instead.' }
+      return { deny: 'Only the lead agent writes the worklog. Report your own progress with op "progress" (done, total, note), and your result (commit sha, gate result, notes) back to the lead.' }
     }
     return serialized(async () => {
       // Apply the change to what is on disk now, not to a copy a hand edit has overtaken.
@@ -306,7 +473,17 @@ export const register: Register = on => {
       }
       await update($, worklog, () => ({ path, doc: result.doc, errors: [], mtimeMs: stat.mtimeMs, startedAt, doneAt }))
       await update($, facts, x => ({ ...x, worklogChangedAt: now, callsSinceChange: 0 }))
-      if (result.isNew) $.ui.toast('Worklog started. /progress opens the pane.')
+      if (result.isNew) {
+        // A new run: its totals start at zero, its diff from today's HEAD.
+        const head = (await git($, ['rev-parse', 'HEAD']))?.trim()
+        await update($, run, () => ({ ...emptyRun(path), ...(head ? { base: head } : {}) }))
+        await flushRun($)
+        $.ui.toast('Worklog started. /progress opens the pane.')
+      }
+      if (input.op === 'finish') {
+        await flushRun($)
+        void refreshGit($)
+      }
       const rel = path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path
       return { result: `${result.message}${result.isNew ? ` · file: ${rel}` : ''}` as never }
     })
@@ -373,11 +550,15 @@ export const register: Register = on => {
       if (/\b(kill|pkill|killall)\b/.test(command)) {
         void refreshSession($)
       }
+      if (/\bgit\b[^;&|]*\b(checkout|switch|worktree)\b/.test(command)) void refreshBranch($)
     }
+
+    await onRun($, r => withToolCall(r, isMain))
 
     if (!isMain) {
       const label = toolLabel(e.tool, e as unknown as Record<string, unknown>)
-      await update($, facts, f => ({ ...f, agents: f.agents.map(a => (a.id === e.agentId ? { ...a, tools: a.tools + 1, lastTool: label } : a)) }))
+      // Its own progress reports are notes in its log already, not tool lines.
+      if (e.tool !== TOOL) await update($, facts, f => ({ ...f, agents: f.agents.map(a => (a.id === e.agentId ? withTool(withResume(normalizeAgent(a)), label, now, failed) : a)) }))
       return withAnswers($, e.agentId, ran)
     }
 
@@ -414,9 +595,29 @@ export const register: Register = on => {
     if ('agentId' in result && typeof result.agentId === 'string') {
       const state = await read($, worklog)
       const now = await $.clock.now()
-      const row = { id: result.agentId, description: e.description, step: stepOfDescription(e.description, state.doc), model: result.model ?? e.model ?? e.parentModel, startedAt: now, status: 'running' as const, tools: 0 }
-      await update($, facts, f => ({ ...f, agents: [...f.agents.filter(a => a.status === 'running' || f.agents.indexOf(a) >= f.agents.length - 12), row] }))
+      const spawn = { id: result.agentId, description: e.description, step: stepOfDescription(e.description, state.doc), subagentType: e.subagentType, model: result.model ?? e.model ?? e.parentModel, at: now }
+      await update($, facts, f => ({ ...f, agents: addAgent(f.agents, newAgent(f.agents, spawn)) }))
+      await onRun($, withAgentSpawn)
     }
+    return result
+  })
+
+  // Each model request: the run's totals; for a subagent also its row (model and effort as sent, tokens, estimated cost).
+  on('turn.step', async function* ($, e, next) {
+    const result = yield* next(e)
+    const agentId = e.agentId
+    const usage = result.usage
+    if (usage === null) return result
+    const model = usage.model || e.model
+    if (agentId === undefined) {
+      await onRun($, r => withMainRequest(r, model, e.effort, usage))
+      return result
+    }
+    const before = (await read($, facts)).agents.find(a => a.id === agentId)
+    await update($, facts, f => ({ ...f, agents: f.agents.map(a => (a.id === agentId ? withUsage(withResume(normalizeAgent(a)), model, e.effort, usage) : a)) }))
+    // Its first request tells its creature and accessory: one more in the run's lineup.
+    const isFirst = before !== undefined && normalizeAgent(before).requests === 0
+    await onRun($, r => (isFirst ? withCrewMember(withAgentRequest(r, model, usage), familyOf(model), effortOf(e.effort)) : withAgentRequest(r, model, usage)))
     return result
   })
 
@@ -429,13 +630,20 @@ export const register: Register = on => {
     const result = await next(e)
     const now = await $.clock.now()
     if (e.agentId === undefined) {
+      await onRun($, r => withMainTurn(r, e.durationMs))
+      await flushRun($)
       await update($, inbox, b => ({ ...b, isTurnRunning: false }))
       // Answered after Claude's last tool call: send it, so it is not lost.
       await deliverAsMessage($)
     }
     if (e.agentId !== undefined) {
       const status = e.reason === 'answer' ? ('done' as const) : ('failed' as const)
-      await update($, facts, f => ({ ...f, agents: f.agents.map(a => (a.id === e.agentId ? { ...a, status, endedAt: now } : a)) }))
+      const endReason = e.reason === 'aborted' ? ('aborted' as const) : ('error' as const)
+      // A run whose requests went unseen still gets the turn's own sum.
+      const usage = e.usage
+      const end = (a: AgentRow) => withEnd(a.requests === 0 && usage ? withUsage(a, usage.model, a.effort, usage) : a, status, now, endReason)
+      await update($, facts, f => ({ ...f, agents: f.agents.map(a => (a.id !== e.agentId ? a : end(normalizeAgent(a)))) }))
+      await onRun($, r => withAgentRun(r, e.durationMs, status === 'failed'))
     } else {
       await poll($)
       await refreshSession($)
@@ -470,6 +678,7 @@ export const register: Register = on => {
       openPlan: () => void openPane($, { tab: 'plan' }),
       openNeeds: () => void openPane($, { tab: 'needs' }),
       openStep: id => void openPane($, { tab: 'step', step: id, back: 'plan' }),
+      openAgents: () => void openPane($, { tab: 'agents' }),
     }, e.surface === 'terminal')
   })
 
@@ -484,6 +693,8 @@ export const register: Register = on => {
     }
     const columns = e.props.bodyColumns ?? e.viewport?.columns ?? 60
     const rows = e.props.scroll?.bodyRows ?? 16
+    // The companions' timer runs only while the terminal shows them (a module flag, not state: drawing never writes).
+    if (e.surface === 'terminal') isCrewShown = ui.tab === 'agents' || ui.tab === 'agent'
     const steps = data.doc.phases.flatMap(p => p.steps)
     const go = (next: Partial<PaneView>) => void update($, view, v => ({ ...v, ...next })).then(() => scrollTop($))
     return drawPane(
@@ -495,8 +706,16 @@ export const register: Register = on => {
         file: () => void $.prompt.fill({ text: `@${data.path} `, mode: 'insert' }),
         close: () => void $.ui.close({ id: PANE }),
         openStep: (id, back) => go({ tab: 'step', step: id, back }),
+        openAgent: (id, back) => go({ tab: 'agent', agent: id, back }),
         back: () => go({ tab: ui.back ?? 'overview' }),
         move: delta => {
+          if (ui.tab === 'agent') {
+            const roster = rosterOf(data.facts.agents)
+            const at = roster.findIndex(a => a.id === ui.agent)
+            const next = roster[Math.min(roster.length - 1, Math.max(0, at + delta))]
+            if (next) go({ agent: next.id })
+            return
+          }
           const i = steps.findIndex(s => s.id === ui.step)
           const target = steps[Math.min(steps.length - 1, Math.max(0, i + delta))]
           if (target) go({ step: target.id })
@@ -534,6 +753,10 @@ export const register: Register = on => {
       return { text: state.errors.length ? `The worklog does not parse:\n${state.errors.map(x => `- line ${x.line}: ${x.message}`).join('\n')}` : 'No active worklog in this repo (plans/*-worklog.md with status: active). /kickoff starts one.' }
     }
     if (verb === 'text') return { text: textOf(data) }
+    if (verb === 'agents') {
+      if (await openPane($, { tab: 'agents' })) return { text: '' }
+      return { text: textOf(data) }
+    }
     // `/progress plan`, `/progress B6`, or the overview.
     const step = verb ? data.doc.phases.flatMap(p => p.steps).find(s => s.id.toLowerCase() === verb.toLowerCase()) : undefined
     const target: Partial<PaneView> = verb === 'plan' ? { tab: 'plan' } : step ? { tab: 'step', step: step.id, back: 'plan' } : { tab: 'overview' }

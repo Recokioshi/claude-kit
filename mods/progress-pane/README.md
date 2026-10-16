@@ -16,7 +16,7 @@ keeps three layers and shows you where they disagree.
 | Layer | Source | Why it holds |
 |---|---|---|
 | **Declared**: phases, steps, decisions, blockers, log | `plans/YYYY-MM-DD-<slug>-worklog.md` in format **WL1** (see `docs/worklog-spec.md`), written through the **`worklog` tool** | Typed input, legal transitions only, ≤ 3 steps doing, length limits. **A step can be marked done only when the latest finished gate run (`npm run dod`, pytest…) started after the step did and passed** (a step done straight from todo counts from the last step marked done); `force` needs a reason and is logged as a Ruling. `finish` needs every step settled and every decision answered, or `force` + a reason. Only the lead agent can write. Hand edits are re-parsed, and errors go back to Claude on the same tool result with line numbers |
-| **Observed**: gate runs, commits, agents, dev servers, context/cost | The mod's own hooks on Bash results, spawns and turns | The engine's facts; the model is not involved |
+| **Observed**: gate runs, commits, agents, dev servers, context/cost | The mod's own hooks on Bash (and PowerShell) results, spawns and turns | The engine's facts; the model is not involved |
 | **Reconciled**: drift | D1 commit not linked to a step (docs-only commits, and commits within 15 min of a step marked done, are fine) · D2 worklog stale (20 min, 15+ calls, and no step started in the last hour still doing) · D3 done without a green gate · D4 agent finished but step still doing · D5 too many doing · D6 gate red | Deterministic rules. Shown as `~` (NOTICED; a red gate as the health `✗`), and told to Claude at most every 10 minutes per rule, so it corrects itself |
 
 While a worklog is active, a short, static system-prompt section reminds Claude of the
@@ -215,7 +215,8 @@ cloud session, the mod disabled in a repo), the skill writes the same WL1 format
 - A gate started in the background has no result to see: `done` then needs the model's
   `gateOk: true` (logged as its claim), and the run is ignored after 30 min.
 - Dev servers (Expo, Convex dev, Vite, Next, emulators) started in the background are listed
-  until `pgrep` no longer finds them.
+  until `pgrep` no longer finds them. Windows has no `pgrep`, so servers are not tracked there
+  (nothing is listed as left running).
 - The worklog file is the source of truth. The mod re-reads it when it changes on disk
   (polled every 5 s).
 - Notebook's ink blue and highlighter follow the `theme` setting (`/config`): a light theme gets
@@ -225,3 +226,13 @@ cloud session, the mod disabled in a repo), the skill writes the same WL1 format
   `Pen glyph` option to `●` in `/config` (or `pluginConfigs.progress-pane.options.pen`).
 - The branch in SIGNALS is the checkout's, read from git (`git branch --show-current`), and read
   again after a checkout or switch.
+
+## Windows
+Works on native Windows Claude Code (0.5.1 and later), as well as macOS, Linux and WSL. Windows
+paths (`C:\repo\plans\x-worklog.md` or `C:/repo/...`) are read as one file, `/progress use`
+takes them or a relative path, and gate runs, commits and background commands are seen from the
+**PowerShell** tool as well as Bash (`;` separators, `&&` in PowerShell 7, `& npm test`). Covered
+by unit tests with Windows-style paths and a PowerShell tool event; not yet run on a real Windows
+machine.
+
+Still unsupported: dev-server tracking (see Notes). The rest of the kit needs WSL.

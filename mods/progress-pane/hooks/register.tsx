@@ -25,8 +25,9 @@ import { COMPANION_COLS, COMPANION_ROWS, companionPixels, rasterCells, WORKING_F
 import { effortOf, familyOf, poseOf, rosterOf } from './crew'
 import { applyOp, TOOL_DESCRIPTION, TOOL_SCHEMA } from './ops'
 import type { ToolInput } from './ops'
-import { commitFromOutput, driftOf, dueNotices, EMPTY_FACTS, gateRunOf, isCommitCommand, isDocsOnly, outputShowsFailure, redGateOf, serverOf, stepOfDescription, toolLabel } from './observe'
+import { commitFromOutput, driftOf, dueNotices, EMPTY_FACTS, gateRunOf, isCommitCommand, isDocsOnly, outputShowsFailure, redGateOf, serverOf, shellCallOf, stepOfDescription, toolLabel } from './observe'
 import type { Facts } from './observe'
+import { isAbsolutePath, isWindowsPath, joinPath, normalizePath, relativeTo, samePath } from './paths'
 import { companionKey } from './agents'
 import { currentStepOf, drawBand, drawPane, isExpanded, textOf } from './view'
 import type { Answer, PaneView, ViewData } from './view'
@@ -77,14 +78,16 @@ function serialized<T>(task: () => Promise<T>): Promise<T> {
 
 async function rootOf($: EngineInterface): Promise<string> {
   try {
-    return (await $.session.repo())?.root ?? (await $.session.cwd())
+    return normalizePath((await $.session.repo())?.root ?? (await $.session.cwd()))
   } catch {
-    return $.session.cwd()
+    return normalizePath(await $.session.cwd())
   }
 }
 
 /** Reads and parses a worklog file into the session's state. */
-async function load($: EngineInterface, path: string): Promise<LogState | null> {
+async function load($: EngineInterface, given: string): Promise<LogState | null> {
+  // One spelling per file (`C:\x` and `c:/x` are one worklog), so its state and stored totals are found again.
+  const path = normalizePath(given)
   try {
     const text = await $.fs.read(path)
     const stat = await $.fs.stat(path)
@@ -118,12 +121,12 @@ async function load($: EngineInterface, path: string): Promise<LogState | null> 
 /** Finds the active worklog: the newest plans/*-worklog.md with `status: active`. */
 async function discover($: EngineInterface): Promise<void> {
   const root = await rootOf($)
-  const dirs = [`${root}/plans`, `${root}/docs/worklogs`]
+  const dirs = [joinPath(root, 'plans'), joinPath(root, 'docs/worklogs')]
   const found: { path: string; mtimeMs: number }[] = []
   for (const dir of dirs) {
     try {
       for (const entry of await $.fs.list(dir)) {
-        if (entry.kind === 'file' && entry.name.endsWith('-worklog.md')) found.push({ path: `${dir}/${entry.name}`, mtimeMs: entry.mtimeMs })
+        if (entry.kind === 'file' && entry.name.endsWith('-worklog.md')) found.push({ path: joinPath(dir, entry.name), mtimeMs: entry.mtimeMs })
       }
     } catch {
       // no such folder
@@ -404,6 +407,8 @@ async function refreshSession($: EngineInterface): Promise<void> {
   }
   const f = await read($, facts)
   if (f.servers.length === 0) return
+  // Windows has no `pgrep`, and no server is recorded there (see tool.call), so none is checked.
+  if (isWindowsPath(await rootOf($))) return
   const alive: Facts['servers'] = []
   for (const s of f.servers) {
     try {
@@ -501,10 +506,10 @@ export const register: Register = (on, options) => {
       }
       const root = await rootOf($)
       let path = result.isNew || state.path === null
-        ? `${root}/plans/${stampOf(now).slice(0, 10)}-${slugOf(result.doc.meta.title)}-worklog.md`
+        ? joinPath(root, `plans/${stampOf(now).slice(0, 10)}-${slugOf(result.doc.meta.title)}-worklog.md`)
         : state.path
       if (result.replaced && state.path !== null) {
-        if (path === state.path) path = path.replace(/-worklog\.md$/, `-${clockOf(now).replace(':', '')}-worklog.md`)
+        if (samePath(path, state.path)) path = path.replace(/-worklog\.md$/, `-${clockOf(now).replace(':', '')}-worklog.md`)
         await $.fs.write(state.path, serializeWorklog(result.replaced))
       }
       await $.fs.write(path, serializeWorklog(result.doc))
@@ -529,7 +534,7 @@ export const register: Register = (on, options) => {
         await flushRun($)
         void refreshGit($)
       }
-      const rel = path.startsWith(`${root}/`) ? path.slice(root.length + 1) : path
+      const rel = relativeTo(root, path)
       return { result: `${result.message}${result.isNew ? ` · file: ${rel}` : ''}` as never }
     })
   })
@@ -537,11 +542,13 @@ export const register: Register = (on, options) => {
   // Observation: every tool call, main loop and subagents.
   on('tool.call', async ($, e, next) => {
     const isMain = e.agentId === undefined
-    const command = e.tool === 'Bash' ? String((e as { command?: string }).command ?? '') : ''
+    // Bash, or PowerShell on Windows: the same `command` and `run_in_background` inputs.
+    const shell = shellCallOf(e.tool, e as unknown as Record<string, unknown>)
+    const command = shell?.command ?? ''
     const state = await read($, worklog)
     const startedAt = await $.clock.now()
     const gateRun = command !== '' ? gateRunOf(command, state.doc?.meta.gate) : null
-    const isBackground = e.tool === 'Bash' && (e as { run_in_background?: boolean }).run_in_background === true
+    const isBackground = shell?.isBackground ?? false
 
     if (gateRun !== null) {
       await update($, facts, f => ({ ...f, gates: [...f.gates, { at: startedAt, ok: null, command, ...(isBackground ? { background: true } : {}) }].slice(-20) }))
@@ -589,7 +596,8 @@ export const register: Register = (on, options) => {
 
     if (command !== '' && !failed) {
       const server = serverOf(command, isBackground)
-      if (server !== null) {
+      // Not on Windows: liveness is checked with `pgrep`, and a server nothing can confirm gone would be flagged forever.
+      if (server !== null && !isWindowsPath(await rootOf($))) {
         await update($, facts, f => (f.servers.some(s => s.pattern === server.pattern) ? f : { ...f, servers: [...f.servers, { ...server, startedAt: now }] }))
       }
       if (/\b(kill|pkill|killall)\b/.test(command)) {
@@ -613,7 +621,7 @@ export const register: Register = (on, options) => {
 
     // A hand edit of the worklog is checked at once.
     const filePath = String((e as { file_path?: string }).file_path ?? '')
-    if (EDIT_TOOLS.includes(e.tool) && state.path !== null && filePath === state.path && !failed) {
+    if (EDIT_TOOLS.includes(e.tool) && state.path !== null && samePath(filePath, state.path) && !failed) {
       const loaded = await load($, state.path)
       await update($, facts, f => ({ ...f, worklogChangedAt: now, callsSinceChange: 0 }))
       if (loaded !== null && loaded.errors.length > 0 && ran.deny === undefined) {
@@ -702,7 +710,7 @@ export const register: Register = (on, options) => {
     const state = await read($, worklog)
     if (state.doc === null || state.doc.meta.status !== 'active' || state.path === null) return result
     const root = await rootOf($)
-    const rel = state.path.startsWith(`${root}/`) ? state.path.slice(root.length + 1) : state.path
+    const rel = relativeTo(root, state.path)
     const text = [
       `# Active worklog: ${rel}`,
       `The user follows this task's progress in that worklog (format WL1). Keep it true:`,
@@ -792,7 +800,7 @@ export const register: Register = (on, options) => {
     }
     if (verb === 'use' && arg) {
       const root = await rootOf($)
-      const loaded = await load($, arg.startsWith('/') ? arg : `${root}/${arg}`)
+      const loaded = await load($, isAbsolutePath(arg) ? arg : joinPath(root, arg))
       return { text: loaded === null ? `Could not read ${arg}.` : loaded.errors.length ? `Loaded ${arg}, with problems: ${loaded.errors.map(x => `line ${x.line}: ${x.message}`).join('; ')}` : `Following ${arg}.` }
     }
     await poll($)

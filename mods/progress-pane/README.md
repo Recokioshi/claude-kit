@@ -1,7 +1,8 @@
 # progress-pane
 
-Mission control for long autonomous tasks: a worklog you can follow while Claude works, made
-reliable and glanceable from the terminal, desktop or phone.
+Mission control for Claude sessions and long autonomous tasks: a worklog you can follow while
+Claude works, made reliable and glanceable from the terminal, desktop or phone. Ships the
+`/kickoff` skill that runs a plan to done on it.
 
 Tested with Claude Code 2.1.296.
 
@@ -20,7 +21,8 @@ contract. It stays the same text, so it doesn't break the prompt cache. After `/
 `worklog show` re-orients Claude.
 
 ## What you see
-**Band** (one line above the prompt, only while a worklog is active):
+**Band** (one line above the prompt, in every session once there is something to show; with a plan
+it looks like this):
 ```
 ! 7/18 ■■■■□□□□□□  ✎ B3 Seat limit checks · 2 agents · gate ✓ 4m · 9e1d0aa 2m · 3h12m       ? 1  ~ 1
 ```
@@ -36,6 +38,25 @@ contract. It stays the same text, so it doesn't break the prompt cache. After `/
   alone never shows `!`: nothing is waiting on you until Claude asks.
 - As the terminal narrows, segments drop: bar → git → agents → gate. The step title is
   truncated, never dropped.
+
+**A session with no worklog** gets the same band and pane without the plan: the model and effort
+the main thread last ran with, its tokens, context fill, agents, gate, last commit and the time
+since its first request. Nothing is drawn until the session has made a request, run an agent, a
+gate or a commit.
+```
+✎ Opus 5.5 · xhigh · 1.2M tokens · ctx 61% · 2 agents · gate ✓ 4m · 9e1d0aa 2m · 42m
+```
+- Click the model to open the pane: the Overview (the main thread's figures, what is noticed,
+  AGENTS, SIGNALS) and the Agents tab. There is no Plan, Log or Needs tab and no `o` File key.
+- Only a red gate is drift (`✗`); a commit is never "unlinked" without steps. Dev servers left
+  running are still listed.
+- The figures are this session's since the mod loaded: they are kept in memory under the session
+  id, not in the plugin store, and start again from zero on a new session id (`/resume`, `/clear`).
+- Nothing is added to the system prompt and Claude hears no drift notices: both need a worklog.
+- When a worklog starts, the band and pane switch to it (its run starts at zero). A paused
+  worklog hands the band back to the session.
+- As the terminal narrows, segments drop: time → tokens → git → agents → gate → effort; the model
+  and context stay. `/progress band off` hides it.
 
 **Pane** (`/progress`; docked beside the transcript or inline), in the Notebook look: a margin
 for status glyphs, a ruled line, the body, and notes that end on the same column; one ruled
@@ -179,7 +200,9 @@ never written to the worklog; the lead is refused it and uses `step`). Every
 call answers with one line: `OK A3 → done · 8/18 done · next: A4 Billing gate; A5 …`. Calls are
 applied one at a time, each to the file as it is on disk. `start` with `replace: true` keeps the
 old worklog with `status: paused`. The
-`/kickoff` skill uses it. Without this mod, `/kickoff` writes the same WL1 format by hand.
+`/kickoff` skill uses it. The skill ships inside this mod (`skills/kickoff`): installing the mod
+gives you `/kickoff` (the full name is `/progress-pane:kickoff`). Where the tool is missing (a
+cloud session, the mod disabled in a repo), the skill writes the same WL1 format by hand.
 
 ## Notes
 - The gate is the worklog's `gate:` (e.g. `npm run dod`), or common test runners when unset.

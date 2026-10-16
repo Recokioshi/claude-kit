@@ -4,7 +4,8 @@
 ```
 skills/<name>/      SKILL.md, references/ (read on demand), evals/evals.json (test prompts)
 mods/<name>/        .claude-plugin/plugin.json, hooks/ (logic + register), types/ (state contract),
-                    tests/, README.md
+                    tests/, README.md, and optionally skills/<name>/ (a skill that belongs to the
+                    mod, e.g. progress-pane's kickoff: it answers to /<name> and /<mod>:<name>)
 .claude-plugin/     marketplace.json: the mods, as the local marketplace "claude-kit"
 docs/               worklog-spec.md (the WL1 worklog format) · api-notes.md (mod API facts)
 install.sh          the installer; its CATALOG lists every item with a one-line description

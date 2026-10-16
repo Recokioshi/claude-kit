@@ -20,7 +20,7 @@ Tested with Claude Code 2.1.289.
 | "Continue", "go on", "dalej" | keeps what was already allowed |
 | "yes", "ok, go ahead", "tak, dawaj" (the whole message) | also what Claude asked in its closing question ("Shall I push?") |
 | `/ship` · `/ship commit` · `/ship push` · `/ship merge` | commit+push+PR · commit · commit+push · all four |
-| `/kickoff …` | commits and merges into task branches (never onto a protected branch). Words in its arguments grant nothing more |
+| `/kickoff …` (or `/progress-pane:kickoff …`, its full name once the skill comes from the progress-pane mod) | commits and merges into task branches (never onto a protected branch). Words in its arguments grant nothing more |
 | "continue" as your **first** message after a pause, restart or resume | brings back the last `/kickoff` in this repo (remembered for 48 h). Any other first message ends it. `/clear` always ends it: a new job starts with no permissions |
 | `/kickoff continue` | the same, at any time, and the skill resumes the run from its worklog |
 

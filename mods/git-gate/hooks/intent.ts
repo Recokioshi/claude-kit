@@ -20,7 +20,7 @@ export type Intent = {
   isAffirmation: boolean
   /** `/ship [mode]` */
   ship?: ShipMode
-  /** `/kickoff …` */
+  /** `/kickoff …`, or `/progress-pane:kickoff …` (the skill ships inside the progress-pane mod, so its full name carries the mod's) */
   isKickoff: boolean
 }
 
@@ -165,7 +165,7 @@ export function readIntent(text: string): Intent {
     return { grants: shipGrants(mode), denies: [], mergeTargets: [], isContinuation: false, isAffirmation: false, ship: mode, isKickoff: false }
   }
 
-  const isKickoff = /^\/kickoff\b/.test(lower)
+  const isKickoff = /^\/(?:progress-pane:)?kickoff\b/.test(lower)
   const isContinuation = CONTINUATIONS.test(lower) || lower === ''
   const isAffirmation = !isContinuation && isAffirmationText(lower)
 

@@ -9,18 +9,18 @@ Pick what you need; every piece works on its own.
 | | What it does | You use it by |
 |---|---|---|
 | **Skills** | | |
-| `kickoff` | Runs a multi-step plan to done: a worklog, a branch per phase, a commit per step with a green gate, subagents, reviews. `/kickoff continue` resumes an interrupted run | `/kickoff plans/x.md [branch] [scope]` |
 | `ship` | Gate, clean commits, push and a pull request against the right base; merges only when asked | `/ship [pr\|commit\|push\|merge]` |
 | `report` | Short, visual status reports: a Slack/Teams message, a one-page meeting summary, a deck outline | `/report [teams\|meeting\|deck\|chat]` |
 | **Mods** | | |
 | `git-gate` | Commits, pushes, PRs, merges and destructive git run only when your message asked for them; everything else is refused before it runs | automatic · `/git-gate` |
-| `progress-pane` | A one-line progress band above the prompt and a `/progress` pane in a Notebook look: plan, step details, log, the questions Claude is waiting on (answerable from the pane while it works), and an Agents tab where each subagent has a pixel companion, its own progress and log | automatic during `/kickoff` · `/progress` |
+| `progress-pane` | **Also ships `/kickoff`:** runs a multi-step plan to done: a worklog, a branch per phase, a commit per step with a green gate, subagents, reviews; `/kickoff continue` resumes an interrupted run. Plus a one-line band above the prompt and a `/progress` pane in a Notebook look: model, effort, tokens, context, agents, gate and git in every session; with a worklog also the plan, step details, log and the questions Claude is waiting on (answerable from the pane while it works). An Agents tab gives each subagent a pixel companion, its own progress and log | automatic · `/progress` |
 | `model-guard` | Choose which model versions Claude and its subagents may use (allow Opus 4.8, block Opus 5), in one list every window on the machine shares, or per repo | `/models` |
 | `handoff` | Writes the state of a task (done, open, decisions, gotchas) for the next repo or session to pick up | `/handoff [to <repo>]` · `/handoff pick` |
 
-**Cost:** the three skills add ≈ 420 tokens to every session (their descriptions) and
-1.5–3.5k while one runs. Of the mods, only progress-pane adds to the prompt: its `worklog` tool,
-and a short contract while a worklog is active.
+**Cost:** the two skills (`ship`, `report`) and `/kickoff` (inside progress-pane) add ≈ 420 tokens
+to every session (their descriptions) and 1.5–3.5k while one runs. Of the mods, only progress-pane
+adds to the prompt: its `worklog` tool, the `/kickoff` description, and a short contract while a
+worklog is active.
 
 ## Requirements
 - Claude Code **2.1.287 or newer** (mods need it; model-guard 0.3 was tested on 2.1.293; check
@@ -43,13 +43,12 @@ cd ~/claude-kit
 claude-kit  pick what to install (↑↓ move · space toggle · a all · n none · enter continue · q quit)
 
   Skills
-  › [x] kickoff        —           /kickoff <plan>: run a multi-step plan to done (worklog, commits, …)
-    [x] ship           —           /ship: gate, clean commits, push and a PR against the right base
+  › [x] ship           —           /ship: gate, clean commits, push and a PR against the right base
     [ ] report         —           /report: short, visual status reports for Slack/Teams, meetings or decks
 
   Mods
     [x] git-gate       installed   git writes only when you asked (commit, push, PR, merge); no UI
-    [x] progress-pane  installed   live worklog band + /progress pane; agent companions; answers mid-run
+    [x] progress-pane  installed   band + /progress pane in every session; /kickoff <plan>: run a plan to done with a live worklog
     [ ] model-guard    —           /models: choose which model versions Claude and its agents may use
     [ ] handoff        —           /handoff: carry a task's state to another repo or session
 ```
@@ -61,7 +60,7 @@ a new session in the desktop app; in a terminal session, `/reload-plugins` is en
 | change your picks (add or remove) | `./install.sh` |
 | update after a `git pull` | `./install.sh` (enter keeps your picks), then a new session in the desktop app or `/reload-plugins` in the terminal |
 | install everything without questions | `./install.sh --all` |
-| install specific ones | `./install.sh --select kickoff,git-gate --yes` |
+| install specific ones | `./install.sh --select progress-pane,git-gate --yes` |
 | see what is installed | `./install.sh --list` |
 | remove everything the kit installed | `./install.sh --uninstall` |
 
@@ -89,7 +88,7 @@ text there.
 | progress band above the prompt | ✓ | ✓ | – (use `/progress`) | – | – |
 
 ## How the pieces work together
-- **`/kickoff`** writes the worklog through progress-pane's tool (a validated format: a step is
+- **`/kickoff`** (shipped inside progress-pane; typed `/kickoff`, or `/progress-pane:kickoff` in full) writes the worklog through progress-pane's tool (a validated format: a step is
   "done" only after the gate passed), and git-gate allows commits and phase merges for that task.
   Never onto `main`/`master`, never a push.
 - **An interrupted run** (sleep, lost connection, app restart): type `continue` as your first

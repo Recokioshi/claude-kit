@@ -301,7 +301,7 @@ export const register: Register = (on, rawOptions) => {
     return next(e)
   })
 
-  on('command.run', { command: ['ship', 'kickoff'] }, async ($, e, next) => {
+  on('command.run', { command: ['ship', 'kickoff', 'progress-pane:kickoff'] }, async ($, e, next) => {
     if (isTrusted(e.origin, options.trustedOrigins)) {
       const text = `/${e.command} ${e.args ?? ''}`
       await applyPrompt($, text)

@@ -148,6 +148,14 @@ describe('protected branches', () => {
     expect(refused(await $.tool.call(bash('git commit -m wip')))).toBe(true)
   })
 
+  test('the bundled skill\'s full name, progress-pane:kickoff, covers the same commits and never a push', async ($, on) => {
+    engineOf(on, { branch: 'claude/billing' })
+    await run($, 'progress-pane:kickoff', 'plans/x.md claude/billing')
+    await say($, 'Continue')
+    expect(refused(await $.tool.call(bash('git commit -m "feat: a1"')))).toBe(false)
+    expect(refused(await $.tool.call(bash('git push')))).toBe(true)
+  })
+
   test('a kickoff covers commits and phase merges on task branches', async ($, on) => {
     engineOf(on, { branch: 'claude/billing' })
     await run($, 'kickoff', 'plans/x.md claude/billing')

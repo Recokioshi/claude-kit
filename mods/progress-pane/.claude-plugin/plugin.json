@@ -1,6 +1,6 @@
 {
   "name": "progress-pane",
-  "version": "0.5.1",
+  "version": "0.6.0",
   "description": "Mission control for Claude sessions, in a Notebook look: a band and /progress pane in every session (model, effort, tokens, context, agents, gate, git), and with a worklog a validated worklog tool Claude updates at every step (done only after a green gate), facts the mod sees for itself (gate runs, commits, branch, agents, context and cost), drift hints where the two disagree, a band above the prompt, a /progress pane, and an Agents tab where every subagent has a pixel companion (the model picks the creature, the effort its accessory) with its own progress, figures and log. Also ships the /kickoff skill, which runs a multi-step plan to done on this worklog.",
   "author": {
     "name": "Adrian Gaik"

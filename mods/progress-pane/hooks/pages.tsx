@@ -18,8 +18,9 @@ import type { PaneActions, PaneView, ViewData } from './view-types'
 export function fullPlan(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions): RenderNode[] {
   const out = [rule(f, 'plan-head', 'PLAN', data.tones.ink, chips(data.doc))]
   for (const p of data.doc.phases) {
-    out.push(phaseRow(f, data, p, { key: `phase-${p.key}`, onPress: () => actions.togglePhase(p.key) }))
-    if (isExpanded(p, ui)) out.push(...p.steps.map(s => stepRow(f, s, data, () => actions.openStep(s.id, 'plan'))))
+    const isOpen = isExpanded(p, ui)
+    out.push(phaseRow(f, data, p, { key: `phase-${p.key}`, onPress: () => actions.togglePhase(p.key), isOpen }))
+    if (isOpen) out.push(...p.steps.map(s => stepRow(f, s, data, () => actions.openStep(s.id, 'plan'))))
   }
   return out
 }

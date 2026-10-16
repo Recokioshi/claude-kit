@@ -11,10 +11,12 @@
 import type { ElementTable } from 'claude-code'
 
 import { accessoryName, COMPANION_COLS, COMPANION_ROWS, companionGlyph, companionPixels, companionSvg, creatureName, rasterCells, WORKING_FRAMES } from './companions'
+import type { Pose } from './companions'
 import { fmtCost, fmtTokens } from './cost'
 import { contextPercent, effortOf, elapsedMs, familyOf, modelName, poseOf, progressOf, rosterOf, totalsOf } from './crew'
 import { ago, lasted } from './observe'
 import type { AgentRow } from './observe'
+import type { Effort, Family } from './crew'
 import type { PaneActions, PaneView, ViewData } from './view-types'
 
 /** The Raster key of an agent's companion: what the hooks module blits the next frame to. */
@@ -25,14 +27,14 @@ const frameAt = (now: number) => Math.floor(now / 500) % WORKING_FRAMES
 
 const SVG_PX = 48
 const MARGIN = 5
-const GAP = 2
+export const GAP = 2
 const LABEL = 9
 
 const clip = (text: string, max: number) => (max <= 1 ? '' : text.length <= max ? text : `${text.slice(0, max - 1)}…`)
 const pad2 = (n: number) => String(n).padStart(2, '0')
 const hhmm = (ms: number) => `${pad2(new Date(ms).getHours())}:${pad2(new Date(ms).getMinutes())}`
 
-type Mark = { glyph: string; tone?: string; bold?: boolean }
+export type Mark = { glyph: string; tone?: string; bold?: boolean }
 
 function markOf(a: AgentRow, data: ViewData): Mark {
   if (a.status === 'done') return { glyph: '✓', tone: 'success' }
@@ -60,25 +62,33 @@ function progressParts(a: AgentRow, cells: number): { filled: string; empty: str
   return { filled: '■'.repeat(n), empty: '□'.repeat(cells - n), label, isOwn: own !== null }
 }
 
+/** Who a companion draws: its Raster key, creature, accessory and pose, and the status its alt reads. */
+export type Sitter = { key: string; family: Family; effort: Effort; pose: Pose; status: string }
+
 /** The companion: a Raster on the terminal (moved on by the timer), an Svg elsewhere, a glyph where neither draws. */
-function companion(t: ElementTable, a: AgentRow, data: ViewData, mono: boolean) {
-  const family = familyOf(a.model)
-  const effort = effortOf(a.effort)
-  const pose = poseOf(a, data.now)
+export function companionArt(t: ElementTable, s: Sitter, now: number, mono: boolean) {
   // The terminal (the monospace surface) alone draws Raster.
   if (mono && 'Raster' in t) {
     const { Raster } = t
-    return <Raster key={companionKey(a.id)} columns={COMPANION_COLS} rows={COMPANION_ROWS} cells={rasterCells(companionPixels(family, effort, pose, frameAt(data.now)))} />
+    return <Raster key={s.key} columns={COMPANION_COLS} rows={COMPANION_ROWS} cells={rasterCells(companionPixels(s.family, s.effort, s.pose, s.pose === 'working' ? frameAt(now) : 0))} />
   }
-  const alt = [creatureName(family), accessoryName(effort)].filter(Boolean).join(' with ')
+  const alt = [creatureName(s.family), accessoryName(s.effort)].filter(Boolean).join(' with ')
   // Every surface without Raster draws Svg; its alt is what a reader without pictures gets.
   if (!('Svg' in t)) return null
   const { Svg } = t
-  return <Svg source={companionSvg(family, effort, pose, SVG_PX)} alt={`${alt || companionGlyph(family)}, ${a.status}`} width={SVG_PX} />
+  return <Svg source={companionSvg(s.family, s.effort, s.pose, SVG_PX)} alt={`${alt || companionGlyph(s.family)}, ${s.status}`} width={SVG_PX} />
 }
 
+/** An agent's companion: the model is the creature, the effort its accessory. */
+function companion(t: ElementTable, a: AgentRow, data: ViewData, mono: boolean) {
+  return companionArt(t, { key: companionKey(a.id), family: familyOf(a.model), effort: effortOf(a.effort), pose: poseOf(a, data.now), status: a.status }, data.now, mono)
+}
+
+/** The companion's column: 12 cells on the terminal, the Svg's width and a cell elsewhere. */
+export const companionWidth = (mono: boolean) => (mono ? COMPANION_COLS : SVG_PX / 8 + 1)
+
 /** The margin column of an entry: its glyph on the first row, the ruled line on every row. */
-function margin(t: ElementTable, key: string, mark: Mark | null, rows: number, mono: boolean) {
+export function margin(t: ElementTable, key: string, mark: Mark | null, rows: number, mono: boolean) {
   const { Box, Text } = t
   if (!mono) {
     return (
@@ -129,6 +139,25 @@ function rule(t: ElementTable, key: string, label: string, tail: string, columns
 
 const blank = (t: ElementTable, key: string, mono: boolean) => (mono ? line(t, key, null, mono) : null)
 
+/** A hairline across the slot: one CSS pixel, a grey that reads on light and dark alike. */
+const HAIRLINE_SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="2000" height="1" viewBox="0 0 2000 1" preserveAspectRatio="none"><rect width="2000" height="1" fill="#808080" fill-opacity="0.4"/></svg>'
+
+/** Between two roster entries: air, a thin rule on the body column, air. */
+function separator(t: ElementTable, key: string, columns: number, mono: boolean) {
+  const { Box, Text } = t
+  if (mono) {
+    return [
+      blank(t, `${key}-a`, mono),
+      line(t, `${key}-line`, <Text color="subtle">{'─'.repeat(Math.max(2, columns - MARGIN - 1))}</Text>, mono),
+      blank(t, `${key}-b`, mono),
+    ]
+  }
+  // Every surface without Raster draws Svg; one without it keeps the air alone.
+  if (!('Svg' in t)) return [<Box key={key} marginY={1} />]
+  const { Svg } = t
+  return [<Box key={key} marginY={1} paddingLeft={3}><Svg source={HAIRLINE_SVG} alt="" height={1} /></Box>]
+}
+
 /** One roster entry: margin, companion, five lines of body; the title opens the agent's page. */
 function entry(t: ElementTable, a: AgentRow, data: ViewData, actions: PaneActions, columns: number, mono: boolean) {
   const { Box, Text, Button } = t
@@ -142,7 +171,7 @@ function entry(t: ElementTable, a: AgentRow, data: ViewData, actions: PaneAction
   return (
     <Box key={`agent-${a.id}`} flexDirection="row">
       {margin(t, `m-${a.id}`, markOf(a, data), COMPANION_ROWS, mono)}
-      <Box flexShrink={0} width={mono ? COMPANION_COLS : SVG_PX / 8 + 1}>{companion(t, a, data, mono)}</Box>
+      <Box flexShrink={0} width={companionWidth(mono)}>{companion(t, a, data, mono)}</Box>
       <Box width={GAP} flexShrink={0} />
       <Box flexDirection="column" flexGrow={1}>
         <Box flexDirection="row">
@@ -179,7 +208,7 @@ export function agentsBlock(t: ElementTable, data: ViewData, ui: PaneView, actio
   }
   out.push(line(t, 'ag-sum', <Text dimColor wrap="truncate-end">{`≈${fmtCost(sum.costUsd)} at API prices · ${fmtTokens(sum.tokens)} tokens · ${ago(sum.spanMs)}${sum.failed ? ` · ${sum.failed} failed` : ''}`}</Text>, mono))
   rows.forEach((a, i) => {
-    out.push(blank(t, `ag-gap-${i}`, mono))
+    out.push(...(i === 0 ? [blank(t, 'ag-gap-0', mono)] : separator(t, `ag-sep-${i}`, columns, mono)))
     out.push(entry(t, a, data, actions, columns, mono))
   })
   return out.filter(Boolean)
@@ -205,7 +234,7 @@ export function agentPage(t: ElementTable, data: ViewData, id: string, columns: 
   const out = [
     <Box key="ap-head" flexDirection="row">
       {margin(t, 'ap-m', markOf(a, data), COMPANION_ROWS, mono)}
-      <Box flexShrink={0} width={mono ? COMPANION_COLS : SVG_PX / 8 + 1}>{companion(t, a, data, mono)}</Box>
+      <Box flexShrink={0} width={companionWidth(mono)}>{companion(t, a, data, mono)}</Box>
       <Box width={GAP} flexShrink={0} />
       <Box flexDirection="column" flexGrow={1}>
         <Text bold wrap="wrap">{a.description || a.subagentType || a.id}</Text>

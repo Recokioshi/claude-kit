@@ -9,7 +9,7 @@ import { agentPage, agentsBlock } from './agents'
 import { allSteps } from './worklog'
 import { frameOf, framed, rule } from './frame'
 import type { Frame } from './frame'
-import { header, headerRows, looseRows, needsBlock, needsRows, planBlock, sections, signalRows, signalsBlock } from './overview'
+import { crewBlock, header, headerRows, looseRows, needsBlock, needsRows, planBlock, sections, signalRows, signalsBlock } from './overview'
 import { planRecap, summaryBlock } from './summary'
 import { fullPlan, ledger, needsDetail, stepDetail } from './pages'
 import { needsOf } from './text'
@@ -45,22 +45,23 @@ function footer(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions): R
   const { Box, Button } = f.t
   const tab = ui.tab
   const needs = needsOf(data).length
+  // A session with no worklog has no plan, log or questions to open, and no file to put in the prompt.
+  const hasPlan = data.isAdhoc !== true
   const tabs: TabSpec[] = [
     { key: 'tab-overview', hotkey: '1', label: 'Overview', isCurrent: tab === 'overview', onPress: () => actions.tab('overview') },
-    { key: 'tab-plan', hotkey: '2', label: 'Plan', isCurrent: tab === 'plan', onPress: () => actions.tab('plan') },
-    { key: 'tab-log', hotkey: '3', label: 'Log', isCurrent: tab === 'log', onPress: () => actions.tab('log') },
+    ...(hasPlan ? [{ key: 'tab-plan', hotkey: '2', label: 'Plan', isCurrent: tab === 'plan', onPress: () => actions.tab('plan') }, { key: 'tab-log', hotkey: '3', label: 'Log', isCurrent: tab === 'log', onPress: () => actions.tab('log') }] : []),
     ...(data.facts.agents.length > 0 || tab === 'agents' ? [{ key: 'tab-agents', hotkey: '4', label: 'Agents', isCurrent: tab === 'agents', onPress: () => actions.tab('agents') }] : []),
-    ...(needs > 0 || tab === 'needs' ? [{ key: 'tab-needs', hotkey: 'n', label: 'Needs you', isCurrent: tab === 'needs', onPress: actions.openNeeds, count: needs }] : []),
+    ...(hasPlan && (needs > 0 || tab === 'needs') ? [{ key: 'tab-needs', hotkey: 'n', label: 'Needs you', isCurrent: tab === 'needs', onPress: actions.openNeeds, count: needs }] : []),
   ]
   // Every tab is `k: label`; on a narrow terminal the gaps close to 1 and "Needs you" becomes "Needs".
-  const cells = (gap: number, list: TabSpec[]) => [...list.map(s => 3 + s.label.length + (s.count === undefined ? 0 : String(s.count).length + 1) + (s.isCurrent ? 2 : 0)), 7, 8].reduce((n, w) => n + w + gap, -gap)
+  const cells = (gap: number, list: TabSpec[]) => [...list.map(s => 3 + s.label.length + (s.count === undefined ? 0 : String(s.count).length + 1) + (s.isCurrent ? 2 : 0)), ...(hasPlan ? [7, 8] : [8])].reduce((n, w) => n + w + gap, -gap)
   const room = f.width - 5
   const gap = !f.mono || cells(2, tabs) <= room ? 2 : 1
   const shown = f.mono && cells(gap, tabs) > room ? tabs.map(s => (s.key === 'tab-needs' ? { ...s, label: 'Needs' } : s)) : tabs
   const row = framed(f, 'footer', (
     <Box flexDirection="row" gap={gap} flexWrap={f.mono ? 'nowrap' : 'wrap'}>
       {shown.map(s => tabButton(f, s))}
-      <Button key="file" plain hotkey="o" label="File" onPress={actions.file} />
+      {hasPlan ? <Button key="file" plain hotkey="o" label="File" onPress={actions.file} /> : null}
       <Button key="close" plain hotkey="x" label="Close" role="dismiss" onPress={actions.close} />
     </Box>
   ))
@@ -91,6 +92,8 @@ function overview(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions, 
   const heads = headerRows(data)
   // A finished run: what it took and used, then the plan as it ended.
   if (data.doc.meta.status === 'done') return sections(f, [top, needsBlock(f, data, 3, actions), summaryBlock(f, data), planRecap(f, data), bottom])
+  // A session with no worklog: what it left running, then the agents, then the signals.
+  if (data.isAdhoc) return sections(f, [top, needsBlock(f, data, columns < 60 ? 2 : 3, actions), crewBlock(f, data, actions), signalsBlock(f, data), bottom])
   if (isInline && width >= TWO_COLUMNS) {
     // The left column keeps the ruled margin; the right one is glyph + space only.
     const half = Math.floor(width / 2) - 1
@@ -116,9 +119,13 @@ function overview(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions, 
   return sections(f, [top, needsBlock(f, data, max, actions), planBlock(f, data, stepRows, actions), signalsBlock(f, data), bottom])
 }
 
+/** The tabs that read the worklog: a session with no worklog shows its Overview in their place. */
+const PLAN_TABS: readonly PaneView['tab'][] = ['plan', 'log', 'step', 'needs']
+
 function body(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions, columns: number, rows: number, isInline: boolean): RenderNode[] {
   const { t, width, mono } = f
   const page = (content: ReadonlyArray<RenderNode | null | undefined>) => sections(f, [header(f, data), [footer(f, data, ui, actions)], content])
+  if (data.isAdhoc && PLAN_TABS.includes(ui.tab)) return overview(f, data, { ...ui, tab: 'overview' }, actions, columns, rows, isInline)
   switch (ui.tab) {
     case 'step': {
       const step = allSteps(data.doc).find(s => s.id === ui.step)

@@ -86,6 +86,8 @@ declare module 'claude-code' {
       worklog: WlState
       facts: PpFacts
       run: PpRun
+      /** A session with no worklog: its totals and when its first request was seen, kept for this session id only. */
+      session: { id: string | null; run: PpRun; startedMs: number | null }
       inbox: { answered: { id: string; question: string; answer: string; at: number; isDelivered: boolean }[]; isTurnRunning: boolean }
       view: { tab: 'overview' | 'plan' | 'log' | 'step' | 'needs' | 'agents' | 'agent'; step?: string; agent?: string; back?: 'overview' | 'plan' | 'agents'; expanded: Record<string, boolean>; isBandHidden: boolean }
     }

@@ -8,7 +8,8 @@
  */
 import { fmtCost, fmtTokens } from './cost'
 import { ago, isStaleGate, since, lasted } from './observe'
-import { totalOf } from './runstats'
+import { modelName } from './crew'
+import { tokensIn, totalOf } from './runstats'
 import type { Facts } from './observe'
 import { allSteps, counts, endedMs, phaseState } from './worklog'
 import type { Attention, Phase, Step, Worklog } from './worklog'
@@ -109,8 +110,30 @@ export function needsOf(data: ViewData): Needs[] {
 
 const TEXT_GLYPH: Record<Step['status'], string> = { todo: '○', doing: '●', done: '✓', blocked: '!', skipped: '–' }
 
+/** A session with no worklog as Markdown: the main thread's figures, the run totals, running agents, gate and last commit. */
+function sessionTextOf(data: ViewData): string {
+  const { facts, now, run } = data
+  const m = run.main
+  const who = [m.model ? modelName(m.model) : '', m.effort ?? '', facts.context ? `ctx ${facts.context.percent}%` : ''].filter(Boolean)
+  const lines = [`**Session**${facts.branch ? ` · \`${facts.branch}\`` : ''}${data.startedMs ? ` · ${elapsedOf(data)}` : ''}`]
+  if (who.length) lines.push(`- ${who.join(' · ')}`)
+  const needs = needsOf(data)
+  if (needs.length) lines.push('', '**Noticed**', ...needs.map(n => `- ${n.glyph} ${n.text}`))
+  const sum = totalOf(run)
+  if (sum.requests > 0) {
+    lines.push('', '**Run**', `- main ${fmtTokens(tokensIn(m))} tokens · ≈${fmtCost(m.costUsd)} · ${lasted(m.workingMs)} working${run.agents.count ? ` · ${run.agents.count} subagents (≈${fmtCost(run.agents.costUsd)})` : ''}`)
+  }
+  const running = facts.agents.filter(a => a.status === 'running')
+  if (running.length) lines.push('', '**Agents**', ...running.map(a => `- ● ${a.description} · ${shortModel(a.model)} · ${ago(now - a.startedAt)}`))
+  const g = lastGate(facts, now)
+  const c = facts.commits[facts.commits.length - 1]
+  lines.push('', `gate ${g ? (g.ok === null ? 'running' : `${g.ok ? '✓' : '✗'} ${since(now - g.at)}`) : 'not run yet'} · last commit ${c ? `${c.sha} ${since(now - c.at)}` : '–'}`)
+  return lines.join('\n')
+}
+
 /** The overview as Markdown, for /progress text and surfaces that draw nothing. */
 export function textOf(data: ViewData): string {
+  if (data.isAdhoc) return sessionTextOf(data)
   const { doc, facts, now } = data
   const { done, total } = counts(doc)
   const lines = [`**${doc.meta.title}** · ${done}/${total} done${doc.meta.branch ? ` · \`${doc.meta.branch}\`` : ''}${data.startedMs ? ` · ${elapsedOf(data)}` : ''}`]

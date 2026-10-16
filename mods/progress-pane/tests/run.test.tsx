@@ -68,8 +68,8 @@ describe('run totals', () => {
   })
 })
 
-/** An engine with the SAMPLE worklog (active or finished), a store in memory and git answering per argv. */
-export function engineOf(on: On, opts: { status?: 'active' | 'done'; stored?: unknown } = {}) {
+/** An engine with the SAMPLE worklog (active or finished, or `none`: a session with no worklog at all), a store in memory and git answering per argv. */
+export function engineOf(on: On, opts: { status?: 'active' | 'done' | 'none'; stored?: unknown } = {}) {
   const text = opts.status === 'done' ? SAMPLE.replace('status: active', 'status: done') : SAMPLE
   const store = new Map<string, unknown>(opts.stored ? [[`run:${PATH}`, opts.stored]] : [])
   const clock = mock.clock(on)
@@ -96,7 +96,7 @@ export function engineOf(on: On, opts: { status?: 'active' | 'done'; stored?: un
     store.set(key, value)
     return { value: undefined } as never
   })
-  on('fs.list', ($, e) => (String((e as { path?: string }).path) === `${ROOT}/plans` ? { value: [{ name: 'a-worklog.md', kind: 'file', size: 1, mtimeMs: 1, isLink: false }] as never } : { deny: 'no such folder' }))
+  on('fs.list', ($, e) => (opts.status !== 'none' && String((e as { path?: string }).path) === `${ROOT}/plans` ? { value: [{ name: 'a-worklog.md', kind: 'file', size: 1, mtimeMs: 1, isLink: false }] as never } : { deny: 'no such folder' }))
   on('fs.read', ($, e) => (String((e as { path?: string }).path) === PATH ? { value: text as never } : { deny: 'missing' }))
   on('fs.stat', () => ({ value: { kind: 'file', size: 1, mtimeMs: 1, isLink: false } as never }))
   on('process.run', ($, e) => {
@@ -126,7 +126,7 @@ export type E = {
   turn: { step: (i: never) => AsyncGenerator<unknown, unknown>; complete: (i: never) => Promise<unknown> }
   agent: { spawn: (i: never) => Promise<unknown> }
   command: { run: (i: never) => Promise<{ text?: string }> }
-  ui: { mount: (i: never) => Promise<{ drawn: () => Promise<unknown> }> }
+  ui: { mount: (i: never) => Promise<{ drawn: () => Promise<unknown>; unmount: () => Promise<unknown> }> }
 }
 
 export const begin = (e: E) => e.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true } as never)

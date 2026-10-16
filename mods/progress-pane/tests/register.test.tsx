@@ -191,7 +191,7 @@ describe('watching the session', () => {
   test('a worklog written by hand mid-session shows up without a restart', async ($, on) => {
     const { handEdit } = engineOf(on)
     await start($)
-    expect((await progress($, 'text')).text).toContain('No active worklog')
+    expect((await progress($, 'text')).text).toContain('**Session**')
     handEdit(`${ROOT}/plans/2026-10-05-hand-worklog.md`, () => SAMPLE)
     expect((await progress($, 'text')).text).toContain('A3 Seat count follows team membership')
   })
@@ -303,10 +303,13 @@ describe('watching the session', () => {
     expect(JSON.stringify(await band.drawn())).not.toContain('2/6')
   })
 
-  test('without a worklog nothing draws and /progress says how to start', async ($, on) => {
+  test('without a worklog /progress opens the session pane, and its text has no plan', async ($, on) => {
     engineOf(on)
     await start($)
-    expect((await progress($)).text).toContain('/kickoff starts one')
+    expect((await progress($)).text).toBe('')
+    const text = (await progress($, 'text')).text ?? ''
+    expect(text).toContain('**Session**')
+    expect(text).not.toContain('**Plan**')
   })
 })
 

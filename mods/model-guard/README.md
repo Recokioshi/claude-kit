@@ -7,6 +7,9 @@ until you block them.
 
 Tested with Claude Code 2.1.293.
 
+Install: `/plugin install model-guard --marketplace Recokioshi/claude-kit`, or through
+`./install.sh` (see the [kit README](../../README.md)).
+
 ## `/models`
 ```
  MODELS · global

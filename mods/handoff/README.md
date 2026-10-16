@@ -5,6 +5,9 @@ finished… I will paste its report below" routine.
 
 Tested with Claude Code 2.1.289.
 
+Install: `/plugin install handoff --marketplace Recokioshi/claude-kit`, or through
+`./install.sh` (see the [kit README](../../README.md)).
+
 ## Writing one: `/handoff [to <repo>] [topic]`
 ```
 /handoff to web consent copy

@@ -7,6 +7,9 @@ and Claude gets a note telling it to ask you. There is no UI.
 
 Tested with Claude Code 2.1.289.
 
+Install: `/plugin install git-gate --marketplace Recokioshi/claude-kit`, or through
+`./install.sh` (see the [kit README](../../README.md)).
+
 ## How permission works
 
 | You say | Allowed |

@@ -6,6 +6,9 @@ Claude works, made reliable and glanceable from the terminal, desktop or phone. 
 
 Tested with Claude Code 2.1.296.
 
+Install: `/plugin install progress-pane --marketplace Recokioshi/claude-kit`, or through
+`./install.sh` (see the [kit README](../../README.md)).
+
 ## Why it can be trusted: three layers
 A UI that only shows what the model *says* is only as good as the model's discipline. This mod
 keeps three layers and shows you where they disagree.

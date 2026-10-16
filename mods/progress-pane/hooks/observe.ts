@@ -3,6 +3,7 @@
  * agents, dev servers left running. Plus the drift rules that compare those
  * facts with the worklog. Pure.
  */
+import { baseName } from './paths'
 import { allSteps } from './worklog'
 import type { Worklog } from './worklog'
 
@@ -55,17 +56,17 @@ export type Facts = {
 
 export const EMPTY_FACTS: Facts = { gates: [], commits: [], agents: [], servers: [], callsSinceChange: 0, worklogChangedAt: 0, told: {} }
 
-/** Where a simple command starts: the line start or after `;` `&&` `||` `|` `(`, past `VAR=x` and `time`. */
-const CMD_START = String.raw`(?:^|[;&|(\n])\s*(?:\w+=\S*\s+)*(?:(?:time|exec|command)\s+)?`
+/** Where a simple command starts: the line start or after `;` `&&` `||` `|` `(` `{`, past `VAR=x` and `time`. Bash and PowerShell share these. */
+const CMD_START = String.raw`(?:^|[;&|({\n])\s*(?:\w+=\S*\s+)*(?:(?:time|exec|command)\s+)?`
 const PY_RUN = String.raw`(?:(?:uv|poetry|pipenv|hatch) run\s+)?`
-const DEFAULT_GATES = [String.raw`npm run (?:dod|test|check)\b`, String.raw`pnpm (?:run )?(?:dod|test)\b`, String.raw`yarn (?:dod|test)\b`, String.raw`${PY_RUN}(?:\S*/)?pytest\b`, String.raw`${PY_RUN}\S*python\S* -m (?:pytest|unittest)\b`, String.raw`cargo test\b`, String.raw`go test\b`]
+const DEFAULT_GATES = [String.raw`npm (?:run (?:dod|test|check)|test)\b`, String.raw`pnpm (?:run )?(?:dod|test)\b`, String.raw`yarn (?:dod|test)\b`, String.raw`${PY_RUN}(?:\S*/)?pytest\b`, String.raw`${PY_RUN}\S*python\S* -m (?:pytest|unittest)\b`, String.raw`cargo test\b`, String.raw`go test\b`]
 
 /** Quoted text is an argument, never a command: `echo "npm run dod"` runs no gate. */
 const unquoted = (text: string) => text.replace(/'[^']*'|"(?:[^"\\]|\\.)*"/g, "''")
 const escapeRe = (text: string) => text.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&').replace(/\s+/g, '\\s+')
 
 /**
- * Whether a Bash command runs the quality gate (the worklog's `gate`, or a common test runner)
+ * Whether a shell command (Bash or PowerShell) runs the quality gate (the worklog's `gate`, or a common test runner)
  * as the program of a simple command. `isPiped`: a pipe, `;` or `||` follows it, so the
  * exit status is not the gate's and its output has to be read.
  */
@@ -134,11 +135,20 @@ export function serverOf(command: string, isBackground: boolean): { label: strin
   return hit ? { label: hit.label, pattern: hit.pattern } : null
 }
 
+/** The tools that run a shell command: PowerShell is what Claude uses on Windows, with the same `command` input. */
+const SHELL_TOOLS = ['Bash', 'PowerShell']
+
+/** The command a Bash or PowerShell call runs, and whether it runs in the background; null for any other tool. */
+export function shellCallOf(tool: string, input: Record<string, unknown>): { command: string; isBackground: boolean } | null {
+  if (!SHELL_TOOLS.includes(tool)) return null
+  return { command: typeof input.command === 'string' ? input.command : '', isBackground: input.run_in_background === true }
+}
+
 /** A short "Edit tiers.ts" for the agent row. */
 export function toolLabel(tool: string, input: Record<string, unknown>): string {
-  const file = typeof input.file_path === 'string' ? input.file_path.split('/').pop() : undefined
+  const file = typeof input.file_path === 'string' ? baseName(input.file_path) : undefined
   if (file) return `${tool} ${file}`
-  if (tool === 'Bash' && typeof input.command === 'string') return `$ ${input.command.trim().split(/\s+/).slice(0, 3).join(' ')}`
+  if (SHELL_TOOLS.includes(tool) && typeof input.command === 'string') return `$ ${input.command.trim().split(/\s+/).slice(0, 3).join(' ')}`
   return tool.replace(/^mcp__[^_]+__/, '')
 }
 

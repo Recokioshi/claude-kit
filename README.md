@@ -31,6 +31,8 @@ worklog is active.
   inside WSL. The Windows desktop app reads `%USERPROFILE%\.claude`, not WSL's `~/.claude`, so it
   doesn't see what the installer sets up there. Native Windows (Git Bash, PowerShell) is not
   supported: the mods assume `/` in paths, and git-gate only checks commands run through the Bash tool.
+  The exception is progress-pane (0.5.1 and later), which handles Windows paths and the PowerShell
+  tool; see its README.
 
 ## Install
 ```bash

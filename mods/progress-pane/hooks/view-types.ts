@@ -33,6 +33,8 @@ export type ViewData = {
   tones: Tones
   /** This run's totals across sessions: the main thread, the crew, git once finished. */
   run: RunStats
+  /** A session with no worklog: `doc` is an empty stand-in, `run` is this session's totals, and no plan is drawn. */
+  isAdhoc?: boolean
 }
 
 export type Tab = 'overview' | 'plan' | 'log' | 'step' | 'needs' | 'agents' | 'agent'
@@ -58,7 +60,7 @@ export type PaneActions = {
   replyInChat: (id: string) => void
 }
 
-export type BandActions = { openPlan: () => void; openStep: (id: string) => void; openNeeds: () => void; openAgents: () => void }
+export type BandActions = { openPlan: () => void; openOverview: () => void; openStep: (id: string) => void; openNeeds: () => void; openAgents: () => void }
 
 /** Notebook's ink and highlighter for each kind of terminal theme. */
 const DARK_TONES = { ink: '#8db4f0', highlighter: '#3a3418' }

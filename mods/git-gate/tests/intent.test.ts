@@ -87,6 +87,12 @@ describe('readIntent: continuations, affirmations, commands', () => {
     expect(intent.isKickoff).toBe(true)
     expect(intent.grants).toContain('commit')
   })
+  test('/progress-pane:kickoff, the full name of the bundled skill, is the same kickoff; another plugin\'s is not', () => {
+    const intent = Hooks.readIntent('/progress-pane:kickoff plans/x.md claude/main')
+    expect(intent.isKickoff).toBe(true)
+    expect(intent.grants).toEqual(['commit'])
+    expect(Hooks.readIntent('/other-plugin:kickoff plans/x.md').isKickoff).toBe(false)
+  })
 })
 
 describe('proposals and answers', () => {

@@ -18,13 +18,14 @@
 import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
+import { ADHOC_DOC, isQuiet } from './adhoc'
 import { addAgent, newAgent, normalizeAgent, withEnd, withProgress, withResume, withTool, withUsage } from './crew'
 import type { AgentRow } from './observe'
 import { COMPANION_COLS, COMPANION_ROWS, companionPixels, rasterCells, WORKING_FRAMES } from './companions'
 import { effortOf, familyOf, poseOf, rosterOf } from './crew'
 import { applyOp, TOOL_DESCRIPTION, TOOL_SCHEMA } from './ops'
 import type { ToolInput } from './ops'
-import { commitFromOutput, driftOf, dueNotices, EMPTY_FACTS, gateRunOf, isCommitCommand, isDocsOnly, outputShowsFailure, serverOf, stepOfDescription, toolLabel } from './observe'
+import { commitFromOutput, driftOf, dueNotices, EMPTY_FACTS, gateRunOf, isCommitCommand, isDocsOnly, outputShowsFailure, redGateOf, serverOf, stepOfDescription, toolLabel } from './observe'
 import type { Facts } from './observe'
 import { companionKey } from './agents'
 import { currentStepOf, drawBand, drawPane, isExpanded, textOf } from './view'
@@ -49,6 +50,9 @@ const facts = atom({ plugin: 'progress-pane', key: 'facts' } as const, EMPTY_FAC
 const inbox = atom({ plugin: 'progress-pane', key: 'inbox' } as const, { answered: [] as Answer[], isTurnRunning: false })
 /** This run's totals (one worklog), loaded from the plugin store and written back at each turn's end. */
 const run = atom({ plugin: 'progress-pane', key: 'run' } as const, emptyRun(null))
+/** A session with no worklog: its totals, for this session id only (a new id starts empty). */
+const EMPTY_SESSION = { id: null as string | null, run: emptyRun(null), startedMs: null as number | null }
+const session = atom({ plugin: 'progress-pane', key: 'session' } as const, EMPTY_SESSION)
 const view = atom({ plugin: 'progress-pane', key: 'view' } as const, { tab: 'overview', expanded: {}, isBandHidden: false } as PaneView & { isBandHidden: boolean })
 
 /** Notebook's colors for this session, from the theme setting (session.start reads it again on reload). */
@@ -157,13 +161,43 @@ async function poll($: EngineInterface): Promise<void> {
   }
 }
 
+async function factsOf($: EngineInterface): Promise<Facts> {
+  const read0 = await read($, facts)
+  return { ...read0, agents: read0.agents.map(normalizeAgent) }
+}
+
 async function viewData($: EngineInterface): Promise<ViewData | null> {
   const state = await read($, worklog)
   if (state.doc === null || state.path === null) return null
-  const read0 = await read($, facts)
-  const f = { ...read0, agents: read0.agents.map(normalizeAgent) }
+  const f = await factsOf($)
   const now = await $.clock.now()
   return { doc: state.doc, path: state.path, facts: f, drift: driftOf(state.doc, f, state.startedAt, now, state.doneAt ?? {}), now, startedMs: startedMs(state.doc), startedAt: state.startedAt, doneAt: state.doneAt ?? {}, answered: (await read($, inbox)).answered, tones, run: await read($, run) }
+}
+
+/** This session's totals; empty when the session id changed since they were kept. Read-only: drawing never writes. */
+async function sessionOf($: EngineInterface) {
+  let id: string | null = null
+  try {
+    id = await $.session.id()
+  } catch {
+    id = null
+  }
+  const s = await read($, session)
+  return s.id === id ? s : { ...EMPTY_SESSION, id }
+}
+
+/** The view of a session with no worklog: the same observed figures, no plan, and only a red gate as drift. */
+async function adhocData($: EngineInterface): Promise<ViewData> {
+  const s = await sessionOf($)
+  const f = await factsOf($)
+  const now = await $.clock.now()
+  const red = redGateOf(f, now)
+  return { doc: ADHOC_DOC, path: '', facts: f, drift: red ? [red] : [], now, startedMs: s.startedMs, startedAt: {}, doneAt: {}, answered: [], tones, run: s.run, isAdhoc: true }
+}
+
+/** The worklog's view, else the session's. */
+async function anyData($: EngineInterface): Promise<ViewData> {
+  return (await viewData($)) ?? adhocData($)
 }
 
 const answerText = (a: Answer) =>
@@ -268,9 +302,20 @@ async function flushRun($: EngineInterface): Promise<void> {
 /** Adds to this run only while its worklog is the active one: what came before or after is not the run's. */
 async function onRun($: EngineInterface, change: (r: RunStats) => RunStats): Promise<void> {
   const state = await read($, worklog)
-  if (state.doc?.meta.status !== 'active' || state.path === null) return
+  if (state.doc?.meta.status !== 'active' || state.path === null) return onSession($, change)
   if ((await read($, run)).path !== state.path) await loadRun($, state.path)
   await update($, run, change)
+}
+
+/** With no active worklog the figures belong to the session: its first one starts the clock. */
+async function onSession($: EngineInterface, change: (r: RunStats) => RunStats): Promise<void> {
+  const now = await $.clock.now()
+  const { id } = await sessionOf($)
+  // Two calls in flight both add to the state as it is when each one lands.
+  await update($, session, s => {
+    const base = s.id === id ? s : { ...EMPTY_SESSION, id }
+    return { ...base, run: change(base.run), startedMs: base.startedMs ?? now }
+  })
 }
 
 async function git($: EngineInterface, args: string[]): Promise<string | null> {
@@ -672,10 +717,14 @@ export const register: Register = (on, options) => {
   on('ui.render', { component: 'AbovePrompt' }, async ($, e, next) => {
     if (e.props.hasSurvey) return next(e)
     const ui = await read($, view)
-    const data = await viewData($)
-    if (data === null || ui.isBandHidden || data.doc.meta.status === 'paused') return next(e)
+    if (ui.isBandHidden) return next(e)
+    // A paused worklog gives the band back to the session; a fresh session has nothing to say yet.
+    const planned = await viewData($)
+    const data = planned !== null && planned.doc.meta.status !== 'paused' ? planned : await adhocData($)
+    if (isQuiet(data)) return next(e)
     return drawBand($.ui.resolve(e), data, e.props.bodyColumns ?? e.viewport?.columns ?? 100, {
       openPlan: () => void openPane($, { tab: 'plan' }),
+      openOverview: () => void openPane($, { tab: 'overview' }),
       openNeeds: () => void openPane($, { tab: 'needs' }),
       openStep: id => void openPane($, { tab: 'step', step: id, back: 'plan' }),
       openAgents: () => void openPane($, { tab: 'agents' }),
@@ -684,13 +733,13 @@ export const register: Register = (on, options) => {
 
   on('ui.render', { component: 'Pane', requestId: PANE }, async ($, e) => {
     const t = $.ui.resolve(e)
-    const data = await viewData($)
-    const ui = await read($, view)
-    if (data === null) {
+    const state = await read($, worklog)
+    if (state.doc === null && state.errors.length > 0) {
       const { Text } = t
-      const state = await read($, worklog)
-      return <Text dimColor>{state.errors.length ? `The worklog does not parse: ${state.errors[0]?.message ?? ''}` : 'No active worklog. /kickoff starts one, or the worklog tool (op: start).'}</Text>
+      return <Text dimColor>{`The worklog does not parse: ${state.errors[0]?.message ?? ''}`}</Text>
     }
+    const data = await anyData($)
+    const ui = await read($, view)
     const columns = e.props.bodyColumns ?? e.viewport?.columns ?? 60
     const rows = e.props.scroll?.bodyRows ?? 16
     // The companions' timer runs only while the terminal shows them (a module flag, not state: drawing never writes).
@@ -747,11 +796,11 @@ export const register: Register = (on, options) => {
       return { text: loaded === null ? `Could not read ${arg}.` : loaded.errors.length ? `Loaded ${arg}, with problems: ${loaded.errors.map(x => `line ${x.line}: ${x.message}`).join('; ')}` : `Following ${arg}.` }
     }
     await poll($)
-    const data = await viewData($)
-    if (data === null) {
-      const state = await read($, worklog)
-      return { text: state.errors.length ? `The worklog does not parse:\n${state.errors.map(x => `- line ${x.line}: ${x.message}`).join('\n')}` : 'No active worklog in this repo (plans/*-worklog.md with status: active). /kickoff starts one.' }
+    const state = await read($, worklog)
+    if (state.doc === null && state.errors.length > 0) {
+      return { text: `The worklog does not parse:\n${state.errors.map(x => `- line ${x.line}: ${x.message}`).join('\n')}` }
     }
+    const data = await anyData($)
     if (verb === 'text') return { text: textOf(data) }
     if (verb === 'agents') {
       if (await openPane($, { tab: 'agents' })) return { text: '' }
@@ -759,7 +808,7 @@ export const register: Register = (on, options) => {
     }
     // `/progress plan`, `/progress B6`, or the overview.
     const step = verb ? data.doc.phases.flatMap(p => p.steps).find(s => s.id.toLowerCase() === verb.toLowerCase()) : undefined
-    const target: Partial<PaneView> = verb === 'plan' ? { tab: 'plan' } : step ? { tab: 'step', step: step.id, back: 'plan' } : { tab: 'overview' }
+    const target: Partial<PaneView> = verb === 'plan' && !data.isAdhoc ? { tab: 'plan' } : step ? { tab: 'step', step: step.id, back: 'plan' } : { tab: 'overview' }
     if (await openPane($, target)) return { text: '' }
     return { text: textOf(data) }
   })

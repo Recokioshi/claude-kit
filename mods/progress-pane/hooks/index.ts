@@ -1,4 +1,5 @@
 export * from './worklog'
+export * from './adhoc'
 export * from './ops'
 export * from './observe'
 export * from './view'

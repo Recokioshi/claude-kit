@@ -7,7 +7,10 @@
  */
 import type { ElementTable, RenderNode } from 'claude-code'
 
+import { fmtTokens } from './cost'
+import { modelName } from './crew'
 import { ago } from './observe'
+import { tokensIn } from './runstats'
 import { counts } from './worklog'
 import { clipTitle, currentStepOf, elapsedOf, gateText, healthOf, meter } from './text'
 import type { BandActions, ViewData } from './view-types'
@@ -17,6 +20,33 @@ export type Seg = { key: string; text: string; tone?: string; dim?: boolean; bol
 
 const SEP = ' · '
 const BAND_CELLS = 10
+/** From this context fill the figure turns to a warning. */
+const CTX_WARN_PERCENT = 80
+
+/**
+ * A session with no worklog: the model and effort the main thread runs with, its
+ * tokens and context fill, then agents, gate, last commit and time since the first request.
+ */
+function sessionSegments(data: ViewData): Seg[] {
+  const { facts, now, run } = data
+  const m = run.main
+  const health = healthOf(data)
+  const running = facts.agents.filter(a => a.status === 'running').length
+  const gate = gateText(facts, now)
+  const commit = facts.commits[facts.commits.length - 1]
+  const ctx = facts.context
+  return [
+    { key: 'health', text: `${health.glyph} `, tone: health.tone, bold: true, drop: 0 },
+    ...(m.model ? [{ key: 'model', text: modelName(m.model), tone: data.tones.ink, bold: true, drop: 0 }] : []),
+    ...(m.effort ? [{ key: 'effort', text: `${SEP}${m.effort}`, dim: true, drop: 2, sep: true }] : []),
+    ...(m.requests > 0 ? [{ key: 'tokens', text: `${SEP}${fmtTokens(tokensIn(m))} tokens`, dim: true, drop: 6, sep: true }] : []),
+    ...(ctx ? [{ key: 'ctx', text: `${SEP}ctx ${ctx.percent}%`, ...(ctx.percent >= CTX_WARN_PERCENT ? { tone: 'warning' } : { dim: true }), drop: 0, sep: true }] : []),
+    ...(running > 0 ? [{ key: 'agents', text: `${SEP}${running} ${running === 1 ? 'agent' : 'agents'}`, dim: true, drop: 4, sep: true }] : []),
+    ...(gate ? [{ key: 'gate', text: `${SEP}${gate.text}`, ...(gate.tone ? { tone: gate.tone } : {}), drop: 3, sep: true }] : []),
+    ...(commit ? [{ key: 'git', text: `${SEP}${commit.sha} ${ago(now - commit.at)}`, dim: true, drop: 5, sep: true }] : []),
+    ...(data.startedMs ? [{ key: 'elapsed', text: `${SEP}${elapsedOf(data)}`, dim: true, drop: 7, sep: true }] : []),
+  ]
+}
 
 /** The band's segments, dropped by priority (higher `drop` goes first) to fit the width. */
 export function bandSegments(data: ViewData, columns: number): { left: Seg[]; right: Seg[] } {
@@ -33,7 +63,7 @@ export function bandSegments(data: ViewData, columns: number): { left: Seg[]; ri
   const noticed = data.drift.filter(d => d.rule !== 'D6').length
   const bar = meter(done, total, BAND_CELLS)
 
-  const left: Seg[] = [
+  const planned: Seg[] = [
     { key: 'health', text: `${health.glyph} `, tone: health.tone, bold: true, drop: 0 },
     { key: 'count', text: `${done}/${total} `, tone: tones.ink, bold: true, drop: 0 },
     { key: 'bar', text: bar.filled, tone: tones.ink, drop: 6 },
@@ -49,6 +79,7 @@ export function bandSegments(data: ViewData, columns: number): { left: Seg[]; ri
     ...(commit ? [{ key: 'git', text: `${SEP}${commit.sha} ${ago(now - commit.at)}`, dim: true, drop: 5, sep: true }] : []),
     ...(data.startedMs ? [{ key: 'elapsed', text: `${SEP}${elapsedOf(data)}`, dim: true, drop: 7, sep: true }] : []),
   ]
+  const left = data.isAdhoc ? sessionSegments(data) : planned
   // Decisions and blockers wait on the person; drift is only noticed (ink, not pencil).
   const right: Seg[] = [
     ...(decisions > 0 ? [{ key: 'q', text: `? ${decisions}`, tone: 'warning', bold: true, drop: 0 }] : []),
@@ -59,7 +90,7 @@ export function bandSegments(data: ViewData, columns: number): { left: Seg[]; ri
   const width = (segs: Seg[]) => segs.reduce((n, s) => n + [...s.text].length, 0)
   const room = columns - width(right) - 3
   let kept = [...left]
-  for (const level of [7, 6, 5, 4, 3]) {
+  for (const level of [7, 6, 5, 4, 3, 2]) {
     if (width(kept) <= room) break
     kept = kept.filter(s => s.drop !== level)
   }
@@ -86,6 +117,10 @@ function segNode(t: ElementTable, s: Seg, data: ViewData, actions?: BandActions)
         {s.text.endsWith(' ') ? <Text> </Text> : null}
       </Box>
     )
+  }
+  // A session's model opens its pane (there is no plan to open).
+  if (actions && s.key === 'model') {
+    return <Button key="band-model" plain label={s.text} onPress={actions.openOverview}><Text color={s.tone} bold>{s.text}</Text></Button>
   }
   if (actions && s.key === 'step' && step) {
     return <Button key="band-step" plain label={s.text} onPress={() => actions.openStep(step.id)} />

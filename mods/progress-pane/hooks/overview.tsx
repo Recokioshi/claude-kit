@@ -6,7 +6,7 @@
 import type { RenderNode } from 'claude-code'
 
 import { fmtCost, fmtTokens } from './cost'
-import { modelName } from './crew'
+import { modelName, rosterOf } from './crew'
 import { ago, lasted, since } from './observe'
 import { tokensIn } from './runstats'
 import type { RunStats } from './runstats'
@@ -33,9 +33,22 @@ export function mainLine(run: RunStats): Part[] | null {
 }
 
 /** Header rows: title, branch with the meter, and the main thread's figures once it made a request. */
-export const headerRows = (data: ViewData): number => (mainLine(data.run) ? 3 : 2)
+export const headerRows = (data: ViewData): number => (data.isAdhoc ? 1 + (data.facts.branch ? 1 : 0) : 2) + (mainLine(data.run) ? 1 : 0)
+
+/** A session with no worklog: the title is "Session", the branch stands alone and there is no meter. */
+function sessionHeader(f: Frame, data: ViewData): RenderNode[] {
+  const health = healthOf(data)
+  const elapsed = elapsedOf(data)
+  const main = mainLine(data.run)
+  return [
+    row(f, 'h1', { glyph: health.glyph, color: health.tone, bold: true, body: [{ text: data.doc.meta.title, bold: true }], ...(elapsed ? { note: [{ text: elapsed, dim: true }] } : {}) }),
+    ...(data.facts.branch ? [row(f, 'h2', { body: [{ text: data.facts.branch, dim: true }] })] : []),
+    ...(main ? [row(f, 'h3', { body: main })] : []),
+  ]
+}
 
 export function header(f: Frame, data: ViewData): RenderNode[] {
+  if (data.isAdhoc) return sessionHeader(f, data)
   const { doc } = data
   const { done, total } = counts(doc)
   const health = healthOf(data)
@@ -172,6 +185,26 @@ export function planBlock(f: Frame, data: ViewData, rows: number, actions?: Pane
     }))
   }
   return out
+}
+
+/** Most agents the session Overview lists; the Agents tab has the rest. */
+const CREW_MAX = 5
+
+/** AGENTS, for a session with no plan to hang them under: running first, each opens its page. */
+export function crewBlock(f: Frame, data: ViewData, actions?: PaneActions): RenderNode[] {
+  const roster = rosterOf(data.facts.agents)
+  if (roster.length === 0) return []
+  const running = roster.filter(a => a.status === 'running').length
+  return [
+    rule(f, 'crew-head', 'AGENTS', data.tones.ink, `${roster.length} · ${running} running`),
+    ...roster.slice(0, CREW_MAX).map(a => row(f, `crew-${a.id}`, {
+      ...(a.status === 'running' ? { glyph: data.tones.pen, color: data.tones.ink } : a.status === 'done' ? { glyph: '✓', color: 'success' } : { glyph: '✗', color: 'error' }),
+      body: [{ text: a.description, ...(a.status === 'running' ? { bold: true } : { dim: true }) }],
+      ...(actions ? { press: { key: `open-crew-${a.id}`, onPress: () => actions.openAgent(a.id, 'overview') } } : {}),
+      note: [{ text: `${shortModel(a.model)} ${ago(data.now - a.startedAt)}`, dim: true }],
+    })),
+    ...(roster.length > CREW_MAX ? [row(f, 'crew-more', { body: [{ text: `+${roster.length - CREW_MAX} more`, dim: true }] })] : []),
+  ]
 }
 
 /** SIGNALS: gate, git (branch, last commit) and context with the session's and the subagents' cost. */

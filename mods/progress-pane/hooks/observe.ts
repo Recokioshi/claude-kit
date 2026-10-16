@@ -144,6 +144,12 @@ export function toolLabel(tool: string, input: Record<string, unknown>): string 
 
 export type Drift = { rule: 'D1' | 'D2' | 'D3' | 'D4' | 'D5' | 'D6'; text: string; step?: string; at: number }
 
+/** D6: the latest gate run failed. Needs no worklog, so a session without one shows it too. */
+export function redGateOf(facts: Facts, now: number): Drift | null {
+  const lastGate = facts.gates[facts.gates.length - 1]
+  return lastGate && lastGate.ok === false ? { rule: 'D6', text: `gate failed ${ago(now - lastGate.at)} ago`, at: lastGate.at } : null
+}
+
 /** Where what Claude declared and what the mod saw disagree. */
 export function driftOf(doc: Worklog | null, facts: Facts, startedAt: Record<string, number>, now: number, doneAt: Record<string, number> = {}): Drift[] {
   if (!doc || doc.meta.status !== 'active') return []
@@ -151,10 +157,8 @@ export function driftOf(doc: Worklog | null, facts: Facts, startedAt: Record<str
   const steps = allSteps(doc)
   const doing = steps.filter(s => s.status === 'doing')
 
-  const lastGate = facts.gates[facts.gates.length - 1]
-  if (lastGate && lastGate.ok === false) {
-    out.push({ rule: 'D6', text: `gate failed ${ago(now - lastGate.at)} ago`, at: lastGate.at })
-  }
+  const red = redGateOf(facts, now)
+  if (red) out.push(red)
 
   // Linked: made while a step was doing, named by a step's sha, or within 15 min of a step marked done. Docs-only needs no step.
   const isLinked = (c: Facts['commits'][number]) =>

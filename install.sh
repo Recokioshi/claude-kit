@@ -3,7 +3,7 @@
 #
 #   ./install.sh                    interactive list (↑/↓ move · space toggle · a all · n none · enter confirm · q quit)
 #   ./install.sh --all              install everything, no questions
-#   ./install.sh --select kickoff,ship,git-gate
+#   ./install.sh --select progress-pane,ship,git-gate
 #                                   install exactly these (others from the kit are left as they are)
 #   ./install.sh --uninstall        remove every skill and mod this kit installed
 #   ./install.sh --list             show what is in the kit and what is installed
@@ -11,6 +11,8 @@
 #            yours is moved to ~/.claude/skills-backup/)
 #
 # Skills are copied to ~/.claude/skills/<name> (re-run after `git pull` to update them).
+# /kickoff is not one of them: it ships inside the progress-pane mod. An older standalone copy
+# of it (marked as from this kit) is removed when progress-pane is installed or updated.
 # Mods are installed from this folder through a local marketplace named "claude-kit": keep the folder
 # where it is. Terminal sessions read them from it, so edits and `git pull` apply after /reload-plugins.
 # The desktop app runs the copy in ~/.claude/plugins/cache/claude-kit/<mod>/<version>/ instead, which
@@ -28,11 +30,10 @@ MIN_CLAUDE="2.1.287"
 # ── catalog ──────────────────────────────────────────────────────────────────
 # kind|name|one line. Folders in skills/ and mods/ that are not listed here are offered too.
 CATALOG=(
-  "skill|kickoff|/kickoff <plan>: run a multi-step plan to done (worklog, commits, agents, reviews)"
   "skill|ship|/ship: gate, clean commits, push and a PR against the right base"
   "skill|report|/report: short, visual status reports for Slack/Teams, meetings or decks"
   "mod|git-gate|git writes only when you asked (commit, push, PR, merge); no UI"
-  "mod|progress-pane|live worklog band + /progress pane; agent companions; answers mid-run"
+  "mod|progress-pane|band + /progress pane in every session; /kickoff <plan>: run a plan to done with a live worklog"
   "mod|model-guard|/models: choose which model versions Claude and its agents may use"
   "mod|handoff|/handoff: carry a task's state to another repo or session"
 )
@@ -48,6 +49,10 @@ known() { local i; for i in "${!NAMES[@]}"; do [ "${KINDS[$i]}|${NAMES[$i]}" = "
 for dir in "$KIT"/skills/*/; do n="$(basename "$dir")"; [ -f "$dir/SKILL.md" ] && ! known skill "$n" && add_item skill "$n" "(skill)"; done
 for dir in "$KIT"/mods/*/; do n="$(basename "$dir")"; [ -f "$dir/.claude-plugin/plugin.json" ] && ! known mod "$n" && add_item mod "$n" "(mod)"; done
 COUNT=${#NAMES[@]}
+
+# Skills that moved into a mod: "<skill>|<mod>". Our old standalone copy would answer a bare
+# /kickoff before the mod's does, and nothing would update it any more.
+RETIRED=("kickoff|progress-pane")
 
 # ── options ──────────────────────────────────────────────────────────────────
 MODE=interactive; SELECT=""; YES=0; FORCE=0
@@ -146,10 +151,21 @@ status_text() {
   esac
 }
 
+# Retired skills of ours still installed, for the plan and --list.
+OLD_SKILLS=()
+for row in "${RETIRED[@]}"; do
+  IFS='|' read -r s m <<<"$row"
+  [ -f "$SKILLS_DIR/$s/$MARKER" ] && OLD_SKILLS+=("$row")
+done
+
 if [ "$MODE" = list ]; then
   printf '%sclaude-kit%s  %s\n\n' "$B" "$N" "$KIT"
   for i in $(seq 0 $((COUNT - 1))); do
     printf '  %-6s %-14s %s  %s%s\n' "${KINDS[$i]}" "${NAMES[$i]}" "$(status_text "${STATES[$i]}")" "${DESCS[$i]}" "$(copy_note "$i")"
+  done
+  for row in ${OLD_SKILLS[@]+"${OLD_SKILLS[@]}"}; do
+    IFS='|' read -r s m <<<"$row"
+    printf '\n  %s! skill %s is an old standalone copy: it now ships inside %s. ./install.sh with %s selected removes it.%s\n' "$Y" "$s" "$m" "$m" "$N"
   done
   exit 0
 fi
@@ -261,7 +277,19 @@ for i in $(seq 0 $((COUNT - 1))); do
   fi
 done
 
-if [ ${#TODO[@]} -eq 0 ]; then echo "Nothing selected, nothing installed. Nothing to do."; exit 0; fi
+# Old standalone skills go when their mod is wanted (or on --uninstall); otherwise they stay and
+# the plan says why.
+DROP_OLD=(); KEEP_OLD=()
+for row in ${OLD_SKILLS[@]+"${OLD_SKILLS[@]}"}; do
+  IFS='|' read -r s m <<<"$row"
+  wanted=0
+  for i in $(seq 0 $((COUNT - 1))); do
+    [ "${KINDS[$i]}|${NAMES[$i]}" = "mod|$m" ] && [ "${CHOSEN[$i]}" -eq 1 ] && [ "${STATES[$i]}" != foreign ] && wanted=1
+  done
+  if [ $wanted -eq 1 ] || [ "$MODE" = uninstall ]; then DROP_OLD+=("$s|$m"); else KEEP_OLD+=("$s|$m"); fi
+done
+
+if [ ${#TODO[@]} -eq 0 ] && [ ${#DROP_OLD[@]} -eq 0 ]; then echo "Nothing selected, nothing installed. Nothing to do."; exit 0; fi
 
 needs_claude=0
 for t in "${TODO[@]}"; do i="${t#*|}"; [ "${KINDS[$i]}" = mod ] && [ "${t%%|*}" != skip ] && needs_claude=1; done
@@ -318,6 +346,14 @@ for t in "${TODO[@]}"; do
   note=""; [ "$a" = skip ] && note="  ${D}(~/.claude/skills/${NAMES[$i]} exists and is not from this kit; --force replaces it and moves yours to ~/.claude/skills-backup/)${N}"
   [ "$a" = update ] && note="$(copy_note "$i" plan)"
   printf '  %s %-5s %s%s\n' "$mark" "${KINDS[$i]}" "${NAMES[$i]}" "$note"
+done
+for row in ${DROP_OLD[@]+"${DROP_OLD[@]}"}; do
+  IFS='|' read -r s m <<<"$row"
+  printf '  %s−%s remove skill %s  %s(old standalone copy; the %s mod ships /%s)%s\n' "$R" "$N" "$s" "$D" "$m" "$s" "$N"
+done
+for row in ${KEEP_OLD[@]+"${KEEP_OLD[@]}"}; do
+  IFS='|' read -r s m <<<"$row"
+  printf '  %s!%s keep   skill %s  %s(old standalone copy; select %s and it is removed, since the mod ships /%s)%s\n' "$Y" "$N" "$s" "$D" "$m" "$s" "$N"
 done
 if [ "$YES" -eq 0 ]; then
   if [ -t 0 ]; then printf '\nApply? [Y/n] '; read -r ans; case "$ans" in ""|y|Y|yes) ;; *) echo "Nothing changed."; exit 0 ;; esac
@@ -391,6 +427,11 @@ for t in "${TODO[@]}"; do
       ;;
     *:skip) echo "  ${Y}!${N} skipped $n" ;;
   esac
+done
+
+for row in ${DROP_OLD[@]+"${DROP_OLD[@]}"}; do
+  IFS='|' read -r s m <<<"$row"
+  remove_skill "$s" && echo "  ${G}✓${N} skill $s removed (it ships inside the $m mod)"
 done
 
 # No mod left: drop the marketplace too.

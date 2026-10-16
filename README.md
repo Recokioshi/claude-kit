@@ -32,7 +32,37 @@ worklog is active.
   doesn't see what the installer sets up there. Native Windows (Git Bash, PowerShell) is not
   supported: the mods assume `/` in paths, and git-gate only checks commands run through the Bash tool.
 
-## Install
+## Install from GitHub (mods only)
+The mods can be installed straight from this repo, without cloning it. The skills (`ship`,
+`report`) are not part of it; use [the installer](#install-with-the-installer) for those.
+```
+/plugin install progress-pane --marketplace Recokioshi/claude-kit
+```
+That adds the `claude-kit` marketplace on first use and installs the mod. Install any of
+`git-gate`, `progress-pane`, `model-guard` and `handoff` the same way, or add the marketplace
+once (`/plugin marketplace add Recokioshi/claude-kit`) and browse them in `/plugin`. Then start
+a new session. Outside a session, the same command is `claude plugin install … --marketplace …`.
+
+| To | Run |
+|---|---|
+| update | `/plugin marketplace update claude-kit`, then `/plugin update <mod>@claude-kit` (or turn on auto-update for `claude-kit` in `/plugin` → Marketplaces) |
+| remove a mod | `/plugin uninstall <mod>@claude-kit` |
+| remove the marketplace | `/plugin marketplace remove claude-kit` |
+
+**For a team:** commit this to a repo's `.claude/settings.json`. Whoever trusts that folder is
+offered the marketplace and the listed mods:
+```json
+{
+  "extraKnownMarketplaces": {
+    "claude-kit": { "source": { "source": "github", "repo": "Recokioshi/claude-kit" } }
+  },
+  "enabledPlugins": { "progress-pane@claude-kit": true }
+}
+```
+Use this route **or** `./install.sh`, not both: the installer registers a local marketplace with
+the same name, `claude-kit`.
+
+## Install with the installer
 ```bash
 git clone <this repo> ~/claude-kit     # keep it here: mods are loaded from this folder
 cd ~/claude-kit

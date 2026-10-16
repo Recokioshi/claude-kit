@@ -150,6 +150,7 @@ export function engineOf(on: On, modelOf: (description: string) => string = () =
   on('turn.step', async function* ($, e) {
     return { turnId: e.turnId, index: e.index, answer: '', toolUses: [], stopReason: 'tool_use', usage: { ...USAGE, model: e.model || OPUS } } as never
   })
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('turn.complete', () => ({ text: '' }))
   on('prompt.compose', () => ({ sections: [] }))
   on('ui.render', () => ({ type: 'Box', props: {}, children: [] }) as never)
@@ -208,6 +209,24 @@ describe('the crew, as the mod sees it', () => {
     expect(JSON.stringify(await pane.drawn())).toContain('"Raster"')
     await clock.advance(1_000)
     expect(blits.some(b => b.key === 'companion-agent-1' && b.cells.length > 0)).toBe(true)
+  })
+
+  test('on the Overview the main thread\'s companion moves while its turn runs, and settles when it ends', async ($, on) => {
+    const { blits, clock } = engineOf(on)
+    const e = $ as unknown as Engine & { turn: { start: (i: never) => Promise<unknown>; complete: (i: never) => Promise<unknown> } }
+    await e.session.start({ cwd: ROOT, surface: 'terminal', isInteractive: true } as never)
+    await e.turn.start({ text: 'go on', turnId: 'm1' } as never)
+    for await (const _ of e.turn.step({ turnId: 'm1', index: 0, model: OPUS, effort: 'high', messageCount: 1 } as never)) void _
+    await $.command.run({ command: 'progress', args: '', origin: { kind: 'composer' }, presentation: { isFullscreen: true, columns: 140 } } as never)
+    const pane = await paneOf($ as never)
+    expect(JSON.stringify(await pane.drawn())).toContain('"companion-main"')
+    await clock.advance(1_000)
+    expect(blits.some(b => b.key === 'companion-main' && b.cells.length > 0)).toBe(true)
+    await e.turn.complete({ turnId: 'm1', reason: 'answer', answer: 'done', durationMs: 5, isAborted: false } as never)
+    blits.length = 0
+    await clock.advance(1_000)
+    expect(blits.some(b => b.key === 'companion-main')).toBe(false)
+    expect(JSON.stringify(await pane.drawn())).toContain('waiting for you')
   })
 
   test('desktop draws the companion as an Svg with an alt; an agent page shows its figures and log', async ($, on) => {

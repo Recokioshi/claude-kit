@@ -29,6 +29,7 @@ import { commitFromOutput, driftOf, dueNotices, EMPTY_FACTS, gateRunOf, isCommit
 import type { Facts } from './observe'
 import { isAbsolutePath, isWindowsPath, joinPath, normalizePath, relativeTo, samePath } from './paths'
 import { companionKey } from './agents'
+import { MAIN_COMPANION } from './lead'
 import { currentStepOf, drawBand, drawPane, isExpanded, textOf } from './view'
 import type { Answer, PaneView, ViewData } from './view'
 import { tonesOf } from './view-types'
@@ -174,7 +175,7 @@ async function viewData($: EngineInterface): Promise<ViewData | null> {
   if (state.doc === null || state.path === null) return null
   const f = await factsOf($)
   const now = await $.clock.now()
-  return { doc: state.doc, path: state.path, facts: f, drift: driftOf(state.doc, f, state.startedAt, now, state.doneAt ?? {}), now, startedMs: startedMs(state.doc), startedAt: state.startedAt, doneAt: state.doneAt ?? {}, answered: (await read($, inbox)).answered, tones, run: await read($, run) }
+  return { doc: state.doc, path: state.path, facts: f, drift: driftOf(state.doc, f, state.startedAt, now, state.doneAt ?? {}), now, startedMs: startedMs(state.doc), startedAt: state.startedAt, doneAt: state.doneAt ?? {}, answered: (await read($, inbox)).answered, tones, run: await read($, run), isMainWorking: (await read($, inbox)).isTurnRunning }
 }
 
 /** This session's totals; empty when the session id changed since they were kept. Read-only: drawing never writes. */
@@ -195,7 +196,7 @@ async function adhocData($: EngineInterface): Promise<ViewData> {
   const f = await factsOf($)
   const now = await $.clock.now()
   const red = redGateOf(f, now)
-  return { doc: ADHOC_DOC, path: '', facts: f, drift: red ? [red] : [], now, startedMs: s.startedMs, startedAt: {}, doneAt: {}, answered: [], tones, run: s.run, isAdhoc: true }
+  return { doc: ADHOC_DOC, path: '', facts: f, drift: red ? [red] : [], now, startedMs: s.startedMs, startedAt: {}, doneAt: {}, answered: [], tones, run: s.run, isAdhoc: true, isMainWorking: (await read($, inbox)).isTurnRunning }
 }
 
 /** The worklog's view, else the session's. */
@@ -421,27 +422,49 @@ async function refreshSession($: EngineInterface): Promise<void> {
   if (alive.length !== f.servers.length) await update($, facts, x => ({ ...x, servers: alive }))
 }
 
+/** The tabs that draw companions on the terminal: the main thread's on the Overview, the crew's on Agents. */
+const COMPANION_TABS: readonly PaneView['tab'][] = ['overview', 'agents', 'agent']
+
+/** The main thread's companion as the Overview draws it: its cells while it works, else nothing to move. */
+async function mainCells($: EngineInterface, frame: number): Promise<string | null> {
+  if (!(await read($, inbox)).isTurnRunning) return null
+  const state = await read($, worklog)
+  if (state.doc?.meta.status === 'done') return null
+  const main = state.doc !== null ? (await read($, run)).main : (await sessionOf($)).run.main
+  if (main.requests === 0) return null
+  return rasterCells(companionPixels(familyOf(main.model ?? ''), effortOf(main.effort), 'working', frame))
+}
+
 /**
- * Moves each running agent's companion one frame on, in place, while the
- * terminal shows the Agents tab or that agent's page. No redraw: a blit.
+ * Moves each working companion one frame on, in place, while the terminal
+ * shows it: the main thread's on the Overview, a running agent's on the
+ * Agents tab or that agent's page. No redraw: a blit.
  */
 async function animateCrew($: EngineInterface): Promise<void> {
   if (!isCrewShown) return
   const ui = await read($, view)
-  if (ui.tab !== 'agents' && ui.tab !== 'agent') {
+  if (!COMPANION_TABS.includes(ui.tab)) {
     isCrewShown = false
     return
   }
   const now = await $.clock.now()
-  // A working companion moves on; a resting one settles on its still frame.
-  const running = (await read($, facts)).agents.map(normalizeAgent).filter(a => a.status === 'running' && (ui.tab === 'agents' || a.id === ui.agent))
   const frame = Math.floor(now / BLIT_MS) % WORKING_FRAMES
-  let isMounted = running.length === 0
-  for (const a of running) {
-    const pose = poseOf(a, now)
-    const cells = rasterCells(companionPixels(familyOf(a.model), effortOf(a.effort), pose, pose === 'working' ? frame : 0))
+  // A working companion moves on; a resting one settles on its still frame.
+  const blits: { key: string; cells: string }[] = []
+  if (ui.tab === 'overview') {
+    const cells = await mainCells($, frame)
+    if (cells !== null) blits.push({ key: MAIN_COMPANION, cells })
+  } else {
+    const running = (await read($, facts)).agents.map(normalizeAgent).filter(a => a.status === 'running' && (ui.tab === 'agents' || a.id === ui.agent))
+    for (const a of running) {
+      const pose = poseOf(a, now)
+      blits.push({ key: companionKey(a.id), cells: rasterCells(companionPixels(familyOf(a.model), effortOf(a.effort), pose, pose === 'working' ? frame : 0)) })
+    }
+  }
+  let isMounted = blits.length === 0
+  for (const b of blits) {
     try {
-      const r = await $.ui.blit({ requestId: PANE, key: companionKey(a.id), cells, columns: COMPANION_COLS, rows: COMPANION_ROWS })
+      const r = await $.ui.blit({ requestId: PANE, key: b.key, cells: b.cells, columns: COMPANION_COLS, rows: COMPANION_ROWS })
       if (r.deny === undefined) isMounted = true
     } catch {
       // the pane closed between two ticks
@@ -751,7 +774,7 @@ export const register: Register = (on, options) => {
     const columns = e.props.bodyColumns ?? e.viewport?.columns ?? 60
     const rows = e.props.scroll?.bodyRows ?? 16
     // The companions' timer runs only while the terminal shows them (a module flag, not state: drawing never writes).
-    if (e.surface === 'terminal') isCrewShown = ui.tab === 'agents' || ui.tab === 'agent'
+    if (e.surface === 'terminal') isCrewShown = COMPANION_TABS.includes(ui.tab)
     const steps = data.doc.phases.flatMap(p => p.steps)
     const go = (next: Partial<PaneView>) => void update($, view, v => ({ ...v, ...next })).then(() => scrollTop($))
     return drawPane(
@@ -761,7 +784,11 @@ export const register: Register = (on, options) => {
       {
         tab: tab => go({ tab }),
         file: () => void $.prompt.fill({ text: `@${data.path} `, mode: 'insert' }),
-        close: () => void $.ui.close({ id: PANE }),
+        close: () => {
+          // Nothing of ours is drawn once it closes: the companions' timer rests until the next draw.
+          isCrewShown = false
+          void $.ui.close({ id: PANE })
+        },
         openStep: (id, back) => go({ tab: 'step', step: id, back }),
         openAgent: (id, back) => go({ tab: 'agent', agent: id, back }),
         back: () => go({ tab: ui.back ?? 'overview' }),

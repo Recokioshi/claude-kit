@@ -69,9 +69,15 @@ blank row between sections; the line the pen is on carries a highlighter.
    │ claude/team-billing                       ■■■■■■■□□□□□□□□□□□  7/18
    │ Opus 5.5 · xhigh · 1.2M tokens · ≈$3.80 · 1h48m working
    │
+   │ 1: Overview 2: Plan 3: Log 4: Agents n: Needs 2 o: File x: Close
+   │
    │ NEEDS YOU ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄
  ? │ D1 Bill per seat or per workspace?                       blocks B4
  ~ │ commit 3f2a1bc not linked to a step                             3m
+   │
+ ✎ │ [owl]  Main thread                                       working
+   │        owl with monocle
+   │        2 agents running · 3 in all
    │
    │ PLAN ┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄┄  ✓A ▸B □C
  ▸ │ B UI                                                           2/6
@@ -86,9 +92,15 @@ blank row between sections; the line the pen is on carries a highlighter.
    │ gate    ✓ passed 4m ago · took 52s
    │ git     claude/team-billing · 9e1d0aa 2m ago · 6 today
    │ ctx     61% · session $4.10 · agents ≈$1.32
-   │
-   │ 1: Overview 2: Plan 3: Log 4: Agents n: Needs 2 o: File x: Close
 ```
+- The menu sits under the header on every page, so it never moves as a page grows.
+- **The main thread has a companion too**, above the plan: the same creature and accessory a
+  subagent on that model and effort gets, working while a turn runs, resting while it waits for
+  you, done with the run. Beside it, which creature that is and how many subagents are running
+  right now. It appears once
+  the main thread made its first request.
+- Phase titles are bold. On desktop, where a button draws its own label, the title stays text
+  and the fold is the `▾ 2/6` button at the row's end.
 - Steps hang under their phase on a thin ink rail, one level in; on desktop and mobile the rail
   is a colored bar, so a phase and its steps read as one block.
 - The meter is the checklist: one box per step (up to 24; 20 boxes above that).
@@ -166,11 +178,17 @@ of the session, running first, each with its own companion.
    │        ■■■□□ 3/5 wiring the guard
    │        120k tokens · ≈$0.42 · 18 tools
    │        Edit seat-limits.ts
+   │
+   │ ──────────────────────────────────────────────────────────────
+   │
+ ✓ │ [fox]  B2 Plan picker                                 took 4m
 ```
+- A thin rule with air on each side parts one agent from the next (a one-pixel line on desktop).
 - **The companion** is a small pixel creature: the model family picks the creature, the effort
   its accessory, and the agent's state its pose (working, resting while it waits on a long call,
   done, failed). On the terminal it is drawn in true color with half-block cells and moves two
-  frames a second while the Agents tab is open; elsewhere it is an SVG.
+  frames a second while the Agents tab (or, for the main thread, the Overview) is open;
+  elsewhere it is an SVG.
 - **Progress** is the agent's own: a subagent reports its plan and each finished step with the
   worklog tool's op `progress` (the `/kickoff` brief asks for it). An agent that reports
   nothing shows its context fill in pencil instead.

@@ -35,6 +35,8 @@ export type ViewData = {
   run: RunStats
   /** A session with no worklog: `doc` is an empty stand-in, `run` is this session's totals, and no plan is drawn. */
   isAdhoc?: boolean
+  /** The main thread is in a turn (from the person's prompt to its answer): its companion works. */
+  isMainWorking?: boolean
 }
 
 export type Tab = 'overview' | 'plan' | 'log' | 'step' | 'needs' | 'agents' | 'agent'

@@ -8,6 +8,7 @@ import type { ElementTable, RenderNode } from 'claude-code'
 import { agentPage, agentsBlock } from './agents'
 import { allSteps } from './worklog'
 import { frameOf, framed, rule } from './frame'
+import { leadBlock, leadRows } from './lead'
 import type { Frame } from './frame'
 import { crewBlock, header, headerRows, looseRows, needsBlock, needsRows, planBlock, sections, signalRows, signalsBlock } from './overview'
 import { planRecap, summaryBlock } from './summary'
@@ -88,35 +89,39 @@ function overview(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions, 
   const { t, width, mono, tones } = f
   const { Box } = t
   const top = header(f, data)
-  const bottom = [footer(f, data, ui, actions)]
+  // The menu sits under the header on every page, so it never moves as a page grows.
+  const menu = [footer(f, data, ui, actions)]
   const heads = headerRows(data)
   // A finished run: what it took and used, then the plan as it ended.
-  if (data.doc.meta.status === 'done') return sections(f, [top, needsBlock(f, data, 3, actions), summaryBlock(f, data), planRecap(f, data), bottom])
+  if (data.doc.meta.status === 'done') return sections(f, [top, menu, needsBlock(f, data, 3, actions), leadBlock(f, data), summaryBlock(f, data), planRecap(f, data)])
   // A session with no worklog: what it left running, then the agents, then the signals.
-  if (data.isAdhoc) return sections(f, [top, needsBlock(f, data, columns < 60 ? 2 : 3, actions), crewBlock(f, data, actions), signalsBlock(f, data), bottom])
+  if (data.isAdhoc) return sections(f, [top, menu, needsBlock(f, data, columns < 60 ? 2 : 3, actions), leadBlock(f, data), crewBlock(f, data, actions), signalsBlock(f, data)])
   if (isInline && width >= TWO_COLUMNS) {
     // The left column keeps the ruled margin; the right one is glyph + space only.
     const half = Math.floor(width / 2) - 1
     const left = frameOf(t, tones, half, mono, true)
     const right = frameOf(t, tones, half, mono, false)
-    const stepRows = Math.max(3, rows - heads - 1 - 2 - 2 - looseRows(data))
+    // The main thread's companion and its blank row sit above the plan in the left column.
+    const lead = leadRows(left, data)
+    const stepRows = Math.max(3, rows - heads - 1 - 2 - 2 - looseRows(data) - (lead ? lead + 1 : 0))
     return sections(f, [
       top,
+      menu,
       [
         <Box key="cols" flexDirection="row" gap={2} marginTop={mono ? 0 : 1}>
-          <Box flexDirection="column" width={half}>{planBlock(left, data, stepRows, actions)}</Box>
+          <Box flexDirection="column" width={half}>{sections(left, [leadBlock(left, data), planBlock(left, data, stepRows, actions)])}</Box>
           <Box flexDirection="column" width={half}>{sections(right, [needsBlock(right, data, 3, actions), signalsBlock(right, data)])}</Box>
         </Box>,
       ],
-      bottom,
     ])
   }
   const max = columns < 60 ? 2 : 3
   const needs = needsRows(data, max)
   // Blank rows survive a short pane; the steps fold into `+N more` instead.
   const blanks = needs > 0 ? 4 : 3
-  const stepRows = Math.max(3, rows - heads - 1 - blanks - needs - 2 - signalRows(data) - looseRows(data))
-  return sections(f, [top, needsBlock(f, data, max, actions), planBlock(f, data, stepRows, actions), signalsBlock(f, data), bottom])
+  const lead = leadRows(f, data)
+  const stepRows = Math.max(3, rows - heads - 1 - blanks - needs - 2 - signalRows(data) - looseRows(data) - (lead ? lead + 1 : 0))
+  return sections(f, [top, menu, needsBlock(f, data, max, actions), leadBlock(f, data), planBlock(f, data, stepRows, actions), signalsBlock(f, data)])
 }
 
 /** The tabs that read the worklog: a session with no worklog shows its Overview in their place. */
@@ -141,7 +146,7 @@ function body(f: Frame, data: ViewData, ui: PaneView, actions: PaneActions, colu
     case 'plan':
       return page(fullPlan(f, data, ui, actions))
     case 'log':
-      return sections(f, [header(f, data), ledgerSection(f, data), [footer(f, data, ui, actions)]])
+      return page(ledgerSection(f, data))
     case 'overview':
       return overview(f, data, ui, actions, columns, rows, isInline)
     default: {

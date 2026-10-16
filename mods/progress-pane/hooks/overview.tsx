@@ -105,13 +105,21 @@ export function chips(doc: Worklog): string {
 
 const doneOf = (p: Phase) => p.steps.filter(s => s.status === 'done' || s.status === 'skipped').length
 
-export function phaseRow(f: Frame, data: ViewData, p: Phase, press?: { key: string; onPress: () => void }): RenderNode {
+/**
+ * A phase's row, its title bold. Given `fold`, the terminal makes the title the
+ * fold Button; a proportional font keeps the title bold Text and folds with a
+ * `▾ 3/3` Button in the note's place (a desktop Button drops a bold label).
+ */
+export function phaseRow(f: Frame, data: ViewData, p: Phase, fold?: { key: string; onPress: () => void; isOpen: boolean }): RenderNode {
   const state = phaseState(p)
+  const count = `${doneOf(p)}/${p.steps.length}`
+  const title = { text: `${p.key} ${p.title}`, bold: true, ...(state === 'done' ? { dim: true } : {}) }
+  const head = { ...phaseGlyph(state, data.tones), body: [title] }
+  if (fold && !f.mono) return row(f, `ph-${p.key}`, { ...head, action: { key: fold.key, label: `${fold.isOpen ? '▾' : '▸'} ${count}`, onPress: fold.onPress } })
   return row(f, `ph-${p.key}`, {
-    ...phaseGlyph(state, data.tones),
-    body: [{ text: `${p.key} ${p.title}`, bold: true, ...(state === 'done' ? { dim: true } : {}) }],
-    ...(press ? { press: { ...press, ...(state === 'done' ? { dim: true } : {}) } } : {}),
-    note: [{ text: `${doneOf(p)}/${p.steps.length}`, dim: true }],
+    ...head,
+    ...(fold ? { press: { key: fold.key, onPress: fold.onPress, ...(state === 'done' ? { dim: true } : {}) } } : {}),
+    note: [{ text: count, dim: true }],
   })
 }
 
@@ -153,7 +161,8 @@ function stepWindow(steps: Step[], rows: number): { start: number; count: number
   const firstOpen = Math.max(0, steps.findIndex(s => s.status !== 'done' && s.status !== 'skipped'))
   let count = Math.min(steps.length, Math.max(1, rows))
   for (;;) {
-    const start = Math.max(0, Math.min(firstOpen - 2, steps.length - count))
+    // Up to two done steps of context above the first open one, never at the cost of that step.
+    const start = Math.max(0, Math.min(firstOpen - Math.min(2, count - 1), steps.length - count))
     const folds = (start > 0 ? 1 : 0) + (steps.length - start - count > 0 ? 1 : 0)
     if (count + folds <= rows || count <= 1) return { start, count }
     count -= 1

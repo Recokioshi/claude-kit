@@ -481,6 +481,10 @@ describe('the Notebook page, measured against the gallery mock', () => {
       ' ! │ Add team billing                                             3h12m',
       '   │ claude/team-billing                       ■■■■■■■□□□□□□□□□□□  7/18',
       '   │',
+      // The menu sits under the header on every page. Seven tabs do not fit 67 cells with 2-cell gaps:
+      // the gaps close to 1 and "Needs you" reads "Needs".
+      '   │ 1:  Overview 2: Plan3: Log4: Agentsn: Needs 2o: Filex: Close',
+      '   │',
       `   │ NEEDS YOU ${'┄'.repeat(57)}`,
       ' ? │ D1 Bill per seat or per workspace?                       blocks B4',
       ' ~ │ commit 3f2a1bc not linked to a step                             3m',
@@ -500,14 +504,11 @@ describe('the Notebook page, measured against the gallery mock', () => {
       '   │ git     9e1d0aa 2m ago · 6 today',
       // Two labelled figures (the session's cost may or may not include its subagents).
       '   │ ctx     61% · session $4.10 · agents ≈$1.32',
-      '   │',
     ]
-    expect(rows.slice(0, mock.length)).toEqual(mock)
+    expect(rows).toEqual(mock)
     // Notes end on cell 71; rules and the highlighter run to cell 72.
-    for (const i of [0, 1, 4, 5, 7, 8, 9, 13]) expect([...(rows[i] ?? '')].length).toBe(71)
-    for (const i of [3, 11, 16]) expect([...(rows[i] ?? '')].length).toBe(72)
-    // Seven tabs do not fit 67 cells with 2-cell gaps: the gaps close to 1 and "Needs you" reads "Needs".
-    expect(rows[mock.length]).toBe('   │ 1:  Overview 2: Plan3: Log4: Agentsn: Needs 2o: Filex: Close')
+    for (const i of [0, 1, 6, 7, 9, 10, 11, 15]) expect([...(rows[i] ?? '')].length).toBe(71)
+    for (const i of [5, 13, 18]) expect([...(rows[i] ?? '')].length).toBe(72)
   })
 
   test('the doing row carries the highlighter as the body background; the current tab is a highlighter chip', async ($, on) => {
@@ -550,7 +551,9 @@ describe('the Notebook page, measured against the gallery mock', () => {
     expect(rows.some(r => r.includes('NEEDS YOU') || r.includes('NOTICED'))).toBe(false)
     expect(rows.filter(r => r === '   │')).toHaveLength(3)
     expect(rows[2]).toBe('   │')
-    expect(rows[3]?.startsWith('   │ PLAN ┄')).toBe(true)
+    expect(rows[3]?.startsWith('   │ 1:  Overview')).toBe(true)
+    expect(rows[4]).toBe('   │')
+    expect(rows[5]?.startsWith('   │ PLAN ┄')).toBe(true)
   })
 
   test('below 48 columns the margin line is dropped and step notes collapse to the sha', async ($, on) => {

@@ -108,6 +108,12 @@ export type RowSpec = Partial<Glyph> & {
   press?: { key: string; onPress: () => void; dim?: boolean }
   /** Right-aligned margin note. */
   note?: Part[]
+  /**
+   * In a proportional font, a Button after the note in place of `press`: a
+   * desktop Button draws its own label style, so a bold body stays bold
+   * outside it. The terminal ignores it and keeps `press`.
+   */
+  action?: { key: string; label: string; onPress: () => void }
   /** The doing row: the highlighter runs under the body to the last cell. */
   highlight?: boolean
   /** A step under its phase: a thin rail in this color before the body, and the body one level in. */
@@ -144,7 +150,7 @@ function bodyNode(f: Frame, spec: RowSpec, parts: Part[]): RenderNode {
 
 /** One row of the page. */
 export function row(f: Frame, key: string, spec: RowSpec): RenderNode {
-  const { Box, Text } = f.t
+  const { Box, Text, Button } = f.t
   const bg = spec.highlight && f.tones.highlighter ? f.tones.highlighter : undefined
   if (!f.mono) {
     return (
@@ -157,6 +163,7 @@ export function row(f: Frame, key: string, spec: RowSpec): RenderNode {
           {bodyNode(f, spec, spec.body)}
           <Box flexGrow={1} minWidth={2} />
           {spec.note?.length ? <Text>{partTexts(f.t, spec.note)}</Text> : null}
+          {spec.action ? <Button key={spec.action.key} plain dimColor label={spec.action.label} onPress={spec.action.onPress} /> : null}
         </Box>
       </Box>
     )
